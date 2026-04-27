@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+
 # Shannon OS Agent
 
 > 用自然语言管理你的服务器 —— AI 运维助手，让基础设施管理像对话一样简单。
@@ -280,7 +281,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 1. 查看路线图，找到感兴趣的方向
 2. 在 [Issues](https://github.com/yourusername/shannon-os-agent/issues) 中讨论或提出新想法
 3. Fork 仓库并提交 Pull Request
-
+4. 添加qq：2661059574
 ---
 
 ## 许可证
