@@ -25,6 +25,7 @@ from app.models import (
     ReActAction,
     ReActAsk,
     ReActCommand,
+    ReActDelegate,
     ReActDone,
 )
 from app.prompts import build_system_prompt
@@ -32,114 +33,40 @@ from app.errors import LLMAPIError, retry_async
 
 logger = logging.getLogger(__name__)
 
-# ── 高风险关键词（子串匹配，命令中包含任一关键词即触发 HIGH） ──
-HIGH_RISK_KEYWORDS = [
-    # 用户管理
-    "useradd", "userdel", "usermod", "groupadd", "groupdel", "passwd",
-    # 权限管理
-    "chown", "chgrp", "chmod", "setenforce", "chcon",
-    # 系统文件修改
-    "/etc/passwd", "/etc/shadow", "/etc/sudoers", "/etc/fstab",
-    "/etc/profile", "/etc/profile.d", "/etc/environment",
-    "/etc/hosts", "/etc/hostname", "/etc/resolv.conf",
-    "/etc/ssh", "/etc/nginx", "/etc/apache", "/etc/httpd",
-    "/etc/mysql", "/etc/postgresql", "/etc/redis",
-    "/etc/docker", "/etc/selinux",
-    # 包管理
-    "yum install", "yum remove", "yum erase", "yum update",
-    "apt-get install", "apt-get remove", "apt-get purge", "apt-get autoremove",
-    "apt install", "apt remove", "apt purge", "apt autoremove",
-    "rpm -e", "rpm -i", "rpm -U", "rpm -q", "dpkg ",
-    "pip install --system", "npm install -g",
-    # 服务管理
-    "systemctl", "service ", "init.d",
-    # 网络/防火墙
-    "iptables", "firewalld", "ufw ", "nft",
-    # 内核/驱动
-    "modprobe", "rmmod", "insmod", "dmesg -c",
-    # 磁盘/存储
-    "dd ", "shred", "mkfs", "fdisk", "parted", "mkswap", "mount ", "umount ",
-    # 重启/关机
-    "reboot", "shutdown", "poweroff", "init 0", "init 6", "halt",
-    # SSH
-    "ssh-keygen", "ssh-copy-id", "ssh-keyscan",
-    # 定时任务
-    "crontab", "cron ",
-    # 进程管理
-    "kill -9", "killall", "pkill",
-    # 远程下载+执行
-    "curl | sh", "curl | bash", "wget | sh", "wget | bash",
-    "curl | /bin/sh", "curl | /bin/bash",
+# ── 硬阻断清单 —— 以下操作禁止自动执行，必须用户手动确认 ──
+_HARD_BLOCK_PATTERNS: list[re.Pattern] = [
+    # 裸盘写入 / 格式化
+    re.compile(r'\bdd\s+.*of=/dev/'),
+    re.compile(r'\bmkfs\b'),
+    re.compile(r'\bmkswap\b'),
+    re.compile(r'\bshred\b'),
+    # fork 炸弹 / 高危 shell
+    re.compile(r':\(\)\s*\{'),
+    re.compile(r'curl.*\|.*(?:sh|bash|dash)'),
+    re.compile(r'wget.*\|.*(?:sh|bash|dash)'),
+    # root 全覆盖
+    re.compile(r'\brm\s+-rf\s+/\b'),
+    re.compile(r'\brm\s+-rf\s+/etc\b'),
+    re.compile(r'\bchmod\s+-R\s+777\s+/'),
+    # 系统级高危写操作
+    re.compile(r'>\s*/etc/'),
+    re.compile(r'>>\s*/etc/(?:passwd|shadow|sudoers)\b'),
 ]
 
-# ── 高风险正则模式（更灵活的匹配，触发任一即 HIGH） ──
-HIGH_RISK_PATTERNS: list[re.Pattern] = [
-    # rm 删除（排除 rm 开头的只读查询类命令）
-    re.compile(r'\brm\s+(-[rfv]+\s+)?[/~]'),
-    re.compile(r'\brm\s+-rf\b'),
-    re.compile(r'\brm\s+-r[fv]?\b'),
-    # sed -i 原地修改系统文件
-    re.compile(r'sed\s+-i\b'),
-    # sudo 特权操作
-    re.compile(r'\bsudo\s+'),
-    # 重定向到系统路径
-    re.compile(r'>>?\s+/etc/'),
-    re.compile(r'>\s+/boot/'),
-    # 危险组合：下载后通过管道执行
-    re.compile(r'(curl|wget)\s+.*\|\s*(sh|bash)'),
-    # Docker 高危操作
-    re.compile(r'docker\s+(rm\s+-f|system\s+prune|volume\s+rm|network\s+rm|run\s+--privileged)'),
-    # chmod 递归或 777
-    re.compile(r'chmod\s+(-R\s+)?777'),
-    # 写入系统路径
-    re.compile(r'(>|>>)\s*/(usr|bin|sbin|lib|opt)/'),
-]
 
-# ── 安全命令白名单（仅纯只读查询，修改系统状态的操作不能在此列） ──
-SAFE_COMMAND_PREFIXES = (
-    "echo ", "printf ", "which ", "type ",
-    "cat ", "head ", "tail ", "less ", "more ",
-    "grep ", "find ", "ls ", "pwd ",
-    "who ", "w ", "last ", "ps ", "top ", "htop ",
-    "df ", "free ", "uptime ", "arch ", "uname ", "hostname ", "id ", "whoami ",
-    "date ", "cal ", "history ",
-    "ping ", "netstat ", "ss ", "ip ", "nslookup ", "dig ",
-    "cd ",
-)
+def is_blocked(command: str) -> tuple[bool, str]:
+    """检查命令是否命中硬阻断清单。返回 (blocked, reason)。"""
+    for pat in _HARD_BLOCK_PATTERNS:
+        if pat.search(command):
+            return True, f"命中硬阻断规则: {pat.pattern}"
+    return False, ""
 
 
 def assess_risk(command: str) -> tuple[str, str]:
-    """评估单条命令的风险等级。
-
-    Returns:
-        (risk_level, reason) — risk_level 为 "HIGH" 或 "LOW", reason 为触发原因。
-    """
-    stripped = command.strip()
-
-    # 安全命令：直接跳过（但要检查是否有输出重定向到系统路径）
-    if stripped.startswith(SAFE_COMMAND_PREFIXES):
-        if re.search(r'>>?\s+/etc/', stripped) or re.search(r'>>?\s+/boot/', stripped):
-            return "HIGH", f"高危: 重定向写入系统路径"
-        return "LOW", ""
-
-    # 正则模式匹配
-    for pattern in HIGH_RISK_PATTERNS:
-        if pattern.search(stripped):
-            return "HIGH", f"高危模式: {pattern.pattern}"
-
-    # 关键词匹配
-    for kw in HIGH_RISK_KEYWORDS:
-        if kw in stripped:
-            return "HIGH", f"高危关键词: {kw}"
-
-    # 检查 rm（通用，不匹配正则的也检查）
-    if re.search(r'\brm\b', stripped):
-        return "HIGH", "高危操作: rm 删除命令"
-
-    # 检查 mv/cp 覆盖
-    if re.search(r'\b(mv|cp)\s+/[^\s]+', stripped):
-        return "HIGH", "高危操作: 移动/复制系统文件"
-
+    """兼容旧接口：硬阻断 → HIGH，否则返回 LOW（实际风险由 LLM 标注）。"""
+    blocked, reason = is_blocked(command)
+    if blocked:
+        return "HIGH", reason
     return "LOW", ""
 
 
@@ -161,9 +88,9 @@ class ShannonAgent:
     # ---- 计划生成 ----
 
     async def stage2_plan_generate(
-        self, user_prompt: str, host_context: dict, mode: str
+        self, user_prompt: str, host_context: dict, mode: str, metrics_text: str = "", hosts_context: list[dict] | None = None
     ) -> AgentOutput:
-        system_prompt = build_system_prompt(mode, host_context, stage="plan")
+        system_prompt = build_system_prompt(mode, host_context, stage="plan", metrics_text=metrics_text, hosts_context=hosts_context)
         return await self._request_json(system_prompt, user_prompt)
 
     # ---- 计划验证 ----
@@ -226,9 +153,9 @@ class ShannonAgent:
     # ---- 首条 action（tool calling 优先） ----
 
     async def _request_first_action(
-        self, user_prompt: str, host_context: dict, mode: str
+        self, user_prompt: str, host_context: dict, mode: str, metrics_text: str = "", hosts_context: list[dict] | None = None, available_tools_text: str = ""
     ) -> ReActAction | None:
-        system_prompt = build_system_prompt(mode, host_context, stage="react")
+        system_prompt = build_system_prompt(mode, host_context, stage="react", metrics_text=metrics_text, hosts_context=hosts_context, available_tools_text=available_tools_text)
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -307,8 +234,8 @@ class ShannonAgent:
             retryable_exceptions=(Exception,),
         )
 
-    def _build_system_prompt(self, mode: str, host_context: dict, stage: str) -> str:
-        return build_system_prompt(mode, host_context, stage)
+    def _build_system_prompt(self, mode: str, host_context: dict, stage: str, metrics_text: str = "", hosts_context: list[dict] | None = None, available_tools_text: str = "") -> str:
+        return build_system_prompt(mode, host_context, stage, metrics_text, hosts_context, available_tools_text)
 
     @staticmethod
     def extract_think(text: str) -> str:
@@ -324,6 +251,7 @@ def _tool_result_to_action(result: dict | None) -> ReActAction | None:
             command=args.get("command", ""),
             purpose=args.get("purpose", ""),
             reasoning=args.get("reasoning", ""),
+            risk_level=args.get("risk_level", "LOW"),
         )
     elif name == "task_done":
         return ReActDone(message=args.get("message", ""))
@@ -332,15 +260,25 @@ def _tool_result_to_action(result: dict | None) -> ReActAction | None:
             message=args.get("message", ""),
             reasoning=args.get("reasoning", ""),
         )
+    elif name == "delegate_task":
+        return ReActDelegate(
+            target_agent=args.get("target_agent", "claude_code"),
+            reason=args.get("reason", ""),
+            risk_level=args.get("risk_level", "LOW"),
+            context_for_delegate=args.get("context_for_delegate", ""),
+            work_dir=args.get("work_dir"),
+        )
     return None
 
 
 def _dict_to_action(data: dict) -> ReActAction:
     action_type = data.get("action")
-    if action_type == "run":
+    if action_type in ("run", "execute_command"):
         return ReActCommand(**data)
-    elif action_type == "done":
+    elif action_type in ("done", "task_done"):
         return ReActDone(**data)
-    elif action_type == "ask":
+    elif action_type in ("ask", "ask_user"):
         return ReActAsk(**data)
+    elif action_type in ("delegate", "delegate_task"):
+        return ReActDelegate(**data)
     raise ValueError(f"Unknown action: {action_type}")

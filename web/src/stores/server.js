@@ -6,13 +6,17 @@ export const useServerStore = defineStore('server', {
   state: () => ({
     servers: [],
     currentServer: null,
+    selectedServers: [],
+    serverPasswords: {},
     loading: false,
     error: null
   }),
   getters: {
     getServerById: (state) => (id) => {
       return state.servers.find(server => server.id === id)
-    }
+    },
+    selectedCount: (state) => state.selectedServers.length,
+    isMultiMode: (state) => state.selectedServers.length > 1,
   },
   actions: {
     async fetchServers() {
@@ -44,6 +48,33 @@ export const useServerStore = defineStore('server', {
     },
     setCurrentServer(server) {
       this.currentServer = server
+      this.selectedServers = server ? [server] : []
+    },
+    toggleServerSelection(server) {
+      const idx = this.selectedServers.findIndex(s => s.id === server.id)
+      if (idx >= 0) {
+        this.selectedServers.splice(idx, 1)
+      } else {
+        this.selectedServers.push(server)
+      }
+      if (this.selectedServers.length === 1) {
+        this.currentServer = this.selectedServers[0]
+      } else if (this.selectedServers.length === 0) {
+        this.currentServer = null
+      }
+    },
+    setSelectedServers(servers) {
+      this.selectedServers = servers
+      if (servers.length === 1) {
+        this.currentServer = servers[0]
+      }
+    },
+    clearSelection() {
+      this.selectedServers = []
+      this.serverPasswords = {}
+    },
+    setServerPassword(hostId, password) {
+      this.serverPasswords[hostId] = password
     },
     async getServerContext(serverId) {
       this.loading = true

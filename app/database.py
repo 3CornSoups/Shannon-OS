@@ -126,6 +126,62 @@ async def init_db() -> None:
                 FOREIGN KEY(host_id) REFERENCES hosts(id),
                 FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
             );
+
+            CREATE TABLE IF NOT EXISTS metrics_snapshots (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                host_id         INTEGER NOT NULL,
+                cpu_usage       REAL,
+                cpu_load_1      REAL,
+                cpu_load_5      REAL,
+                cpu_load_15     REAL,
+                memory_usage    REAL,
+                memory_used_kb  INTEGER,
+                memory_total_kb INTEGER,
+                disk_partitions TEXT,
+                disk_max_usage  REAL,
+                network_rx      INTEGER,
+                network_tx      INTEGER,
+                process_count   INTEGER,
+                raw_data        TEXT,
+                collected_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY(host_id) REFERENCES hosts(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_metrics_host_time ON metrics_snapshots(host_id, collected_at);
+
+            CREATE TABLE IF NOT EXISTS alert_rules (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                name            TEXT NOT NULL,
+                metric_type     TEXT NOT NULL,
+                operator        TEXT NOT NULL,
+                threshold       REAL NOT NULL,
+                duration        INTEGER DEFAULT 0,
+                severity        TEXT DEFAULT 'warning',
+                enabled         INTEGER DEFAULT 1,
+                channels        TEXT DEFAULT '[]',
+                host_ids        TEXT DEFAULT '[]',
+                created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS alert_events (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule_id         INTEGER NOT NULL,
+                host_id         INTEGER NOT NULL,
+                severity        TEXT NOT NULL,
+                status          TEXT NOT NULL DEFAULT 'alerting',
+                current_value   REAL,
+                threshold       REAL,
+                message         TEXT,
+                triggered_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                recovered_at    TEXT,
+                acknowledged_at TEXT,
+                acknowledged_by TEXT,
+                notify_count    INTEGER DEFAULT 1,
+                FOREIGN KEY(rule_id) REFERENCES alert_rules(id),
+                FOREIGN KEY(host_id) REFERENCES hosts(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_alerts_status ON alert_events(status, host_id);
+            CREATE INDEX IF NOT EXISTS idx_alerts_time ON alert_events(triggered_at);
             """
         )
 
@@ -144,6 +200,27 @@ async def init_db() -> None:
             logger.info("数据库迁移：添加 conversation_id 列")
         except Exception:
             pass  # 列已存在
+
+        # 预置默认告警规则（仅首次）
+        cursor = await conn.execute("SELECT COUNT(*) FROM alert_rules")
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row and row[0] == 0:
+            preset_rules = [
+                ("CPU使用率过高(严重)", "cpu", ">", 95.0, 60, "critical", 1, "[]", "[]"),
+                ("CPU使用率过高(警告)", "cpu", ">", 85.0, 300, "warning", 1, "[]", "[]"),
+                ("内存使用率过高(严重)", "memory", ">", 90.0, 60, "critical", 1, "[]", "[]"),
+                ("内存使用率过高(警告)", "memory", ">", 80.0, 300, "warning", 1, "[]", "[]"),
+                ("磁盘使用率过高(严重)", "disk", ">", 90.0, 0, "critical", 1, "[]", "[]"),
+                ("磁盘使用率过高(警告)", "disk", ">", 80.0, 0, "warning", 1, "[]", "[]"),
+                ("系统负载过高", "load", ">", 2.0, 300, "warning", 1, "[]", "[]"),
+            ]
+            for rule in preset_rules:
+                await conn.execute(
+                    "INSERT INTO alert_rules(name, metric_type, operator, threshold, duration, severity, enabled, channels, host_ids) VALUES(?,?,?,?,?,?,?,?,?)",
+                    rule,
+                )
+            logger.info("预置 7 条默认告警规则")
 
         await conn.commit()
     finally:
@@ -459,6 +536,44 @@ async def append_operation_log(
         await conn.close()
 
 
+async def append_delegate_log(
+    host_id: int | None,
+    task_id: str,
+    agent: str,
+    task: str,
+    reason: str,
+    risk_level: str,
+    exit_code: int | None,
+    goal_achieved: str | None,
+    execution_time_sec: float | None,
+    files_changed: list[str] | None,
+    cancelled: bool = False,
+    timed_out: bool = False,
+) -> None:
+    """记录委托操作日志"""
+    return await append_operation_log(
+        host_id=host_id,
+        mode="delegate",
+        intent="delegation",
+        commands_plan=[{
+            "agent": agent,
+            "task": task,
+            "reason": reason,
+            "risk_level": risk_level,
+            "exit_code": exit_code,
+            "goal_achieved": goal_achieved,
+            "execution_time_sec": execution_time_sec,
+            "files_changed": files_changed or [],
+            "cancelled": cancelled,
+            "timed_out": timed_out,
+        }],
+        risk_level=risk_level,
+        status="completed" if not cancelled else "cancelled",
+        exit_code=exit_code,
+        task_id=task_id,
+    )
+
+
 async def append_audit_record(
     host_id: int | None,
     task_id: str,
@@ -682,5 +797,530 @@ async def clear_chat_messages(host_id: int) -> None:
     try:
         await conn.execute("DELETE FROM chat_messages WHERE host_id = ?", (host_id,))
         await conn.commit()
+    finally:
+        await conn.close()
+
+
+# ---- 指标快照 (metrics_snapshots) ----
+
+async def insert_metrics_snapshot(host_id: int, data: dict[str, Any]) -> int:
+    cpu = data.get("cpu", {})
+    memory = data.get("memory", {})
+    disk = data.get("disk", {})
+    network = data.get("network", {})
+    processes = data.get("processes", {})
+
+    partitions = disk.get("partitions", [])
+    disk_max = max((p.get("usage_percent", 0) for p in partitions), default=0)
+
+    from datetime import datetime
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            INSERT INTO metrics_snapshots(
+                host_id, cpu_usage, cpu_load_1, cpu_load_5, cpu_load_15,
+                memory_usage, memory_used_kb, memory_total_kb,
+                disk_partitions, disk_max_usage,
+                network_rx, network_tx, process_count, raw_data, collected_at
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                host_id,
+                cpu.get("usage_percent"),
+                cpu.get("load_avg_1"),
+                cpu.get("load_avg_5"),
+                cpu.get("load_avg_15"),
+                memory.get("usage_percent"),
+                memory.get("used_kb"),
+                memory.get("total_kb"),
+                json.dumps(partitions, ensure_ascii=False),
+                disk_max,
+                network.get("total_rx"),
+                network.get("total_tx"),
+                processes.get("total_count"),
+                json.dumps(data, ensure_ascii=False),
+                now,
+            ),
+        )
+        await conn.commit()
+        return int(cursor.lastrowid)
+    finally:
+        await conn.close()
+
+
+async def get_metrics_history(
+    host_id: int, from_time: str, to_time: str
+) -> dict[str, Any]:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT cpu_usage, memory_usage, collected_at
+            FROM metrics_snapshots
+            WHERE host_id = ? AND collected_at >= ? AND collected_at <= ?
+            ORDER BY collected_at ASC
+            """,
+            (host_id, from_time, to_time),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        timestamps = []
+        cpu_usage = []
+        memory_usage = []
+        for row in rows:
+            timestamps.append(row["collected_at"])
+            cpu_usage.append(row["cpu_usage"] or 0)
+            memory_usage.append(row["memory_usage"] or 0)
+        return {
+            "timestamps": timestamps,
+            "cpu_usage": cpu_usage,
+            "memory_usage": memory_usage,
+        }
+    finally:
+        await conn.close()
+
+
+async def get_latest_metrics_for_all_hosts() -> list[dict[str, Any]]:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT m.* FROM metrics_snapshots m
+            INNER JOIN (
+                SELECT host_id, MAX(collected_at) AS max_time
+                FROM metrics_snapshots
+                GROUP BY host_id
+            ) latest ON m.host_id = latest.host_id AND m.collected_at = latest.max_time
+            """
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [dict(row) for row in rows]
+    finally:
+        await conn.close()
+
+
+async def get_latest_metrics_for_host(host_id: int) -> dict[str, Any] | None:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT * FROM metrics_snapshots
+            WHERE host_id = ?
+            ORDER BY collected_at DESC
+            LIMIT 1
+            """,
+            (host_id,),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return dict(row) if row else None
+    finally:
+        await conn.close()
+
+
+# ---- 告警规则 (alert_rules) ----
+
+async def get_alert_rules() -> list[dict[str, Any]]:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute("SELECT * FROM alert_rules ORDER BY created_at DESC")
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [dict(row) for row in rows]
+    finally:
+        await conn.close()
+
+
+async def get_alert_rule_by_id(rule_id: int) -> dict[str, Any] | None:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute("SELECT * FROM alert_rules WHERE id = ?", (rule_id,))
+        row = await cursor.fetchone()
+        await cursor.close()
+        return dict(row) if row else None
+    finally:
+        await conn.close()
+
+
+async def create_alert_rule(data: dict[str, Any]) -> int:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            INSERT INTO alert_rules(name, metric_type, operator, threshold, duration, severity, enabled, channels, host_ids)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["name"],
+                data["metric_type"],
+                data["operator"],
+                data["threshold"],
+                data.get("duration", 0),
+                data.get("severity", "warning"),
+                data.get("enabled", 1),
+                json.dumps(data.get("channels", []), ensure_ascii=False),
+                json.dumps(data.get("host_ids", []), ensure_ascii=False),
+            ),
+        )
+        await conn.commit()
+        return int(cursor.lastrowid)
+    finally:
+        await conn.close()
+
+
+async def update_alert_rule(rule_id: int, data: dict[str, Any]) -> bool:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            UPDATE alert_rules
+            SET name = ?, metric_type = ?, operator = ?, threshold = ?, duration = ?,
+                severity = ?, enabled = ?, channels = ?, host_ids = ?, updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (
+                data["name"],
+                data["metric_type"],
+                data["operator"],
+                data["threshold"],
+                data.get("duration", 0),
+                data.get("severity", "warning"),
+                data.get("enabled", 1),
+                json.dumps(data.get("channels", []), ensure_ascii=False),
+                json.dumps(data.get("host_ids", []), ensure_ascii=False),
+                rule_id,
+            ),
+        )
+        await conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def delete_alert_rule(rule_id: int) -> bool:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute("DELETE FROM alert_rules WHERE id = ?", (rule_id,))
+        await conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def toggle_alert_rule(rule_id: int) -> bool:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            UPDATE alert_rules
+            SET enabled = CASE WHEN enabled = 1 THEN 0 ELSE 1 END,
+                updated_at = datetime('now')
+            WHERE id = ?
+            """,
+            (rule_id,),
+        )
+        await conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def get_active_rules_for_host(host_id: int) -> list[dict[str, Any]]:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            "SELECT * FROM alert_rules WHERE enabled = 1 ORDER BY created_at"
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        result = []
+        for row in rows:
+            rule = dict(row)
+            host_ids_str = rule.get("host_ids", "[]")
+            try:
+                host_ids = json.loads(host_ids_str) if host_ids_str else []
+            except Exception:
+                host_ids = []
+            if not host_ids or host_id in host_ids:
+                result.append(rule)
+        return result
+    finally:
+        await conn.close()
+
+
+async def seed_preset_rules() -> int:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute("SELECT COUNT(*) FROM alert_rules")
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row and row[0] > 0:
+            return 0
+        preset_rules = [
+            ("CPU使用率过高(严重)", "cpu", ">", 95.0, 60, "critical", 1, "[]", "[]"),
+            ("CPU使用率过高(警告)", "cpu", ">", 85.0, 300, "warning", 1, "[]", "[]"),
+            ("内存使用率过高(严重)", "memory", ">", 90.0, 60, "critical", 1, "[]", "[]"),
+            ("内存使用率过高(警告)", "memory", ">", 80.0, 300, "warning", 1, "[]", "[]"),
+            ("磁盘使用率过高(严重)", "disk", ">", 90.0, 0, "critical", 1, "[]", "[]"),
+            ("磁盘使用率过高(警告)", "disk", ">", 80.0, 0, "warning", 1, "[]", "[]"),
+            ("系统负载过高", "load", ">", 2.0, 300, "warning", 1, "[]", "[]"),
+        ]
+        for rule in preset_rules:
+            await conn.execute(
+                "INSERT INTO alert_rules(name, metric_type, operator, threshold, duration, severity, enabled, channels, host_ids) VALUES(?,?,?,?,?,?,?,?,?)",
+                rule,
+            )
+        await conn.commit()
+        logger.info(f"预置 {len(preset_rules)} 条默认告警规则")
+        return len(preset_rules)
+    finally:
+        await conn.close()
+
+
+# ---- 告警事件 (alert_events) ----
+
+async def create_alert_event(
+    rule_id: int,
+    host_id: int,
+    severity: str,
+    current_value: float,
+    threshold: float,
+    message: str,
+) -> int:
+    from datetime import datetime
+    conn = await get_connection()
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor = await conn.execute(
+            """
+            INSERT INTO alert_events(rule_id, host_id, severity, status, current_value, threshold, message, triggered_at)
+            VALUES(?, ?, ?, 'alerting', ?, ?, ?, ?)
+            """,
+            (rule_id, host_id, severity, current_value, threshold, message, now),
+        )
+        await conn.commit()
+        return int(cursor.lastrowid)
+    finally:
+        await conn.close()
+
+
+async def get_alert_events(
+    host_id: int | None = None,
+    severity: str | None = None,
+    status: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> tuple[list[dict[str, Any]], int]:
+    conn = await get_connection()
+    try:
+        conditions = []
+        params: list[Any] = []
+
+        if host_id is not None:
+            conditions.append("e.host_id = ?")
+            params.append(host_id)
+        if severity:
+            conditions.append("e.severity = ?")
+            params.append(severity)
+        if status:
+            conditions.append("e.status = ?")
+            params.append(status)
+
+        where_clause = ""
+        if conditions:
+            where_clause = "WHERE " + " AND ".join(conditions)
+
+        count_cursor = await conn.execute(
+            f"SELECT COUNT(*) FROM alert_events e {where_clause}", tuple(params)
+        )
+        count_row = await count_cursor.fetchone()
+        await count_cursor.close()
+        total = count_row[0] if count_row else 0
+
+        offset = (page - 1) * page_size
+        cursor = await conn.execute(
+            f"""
+            SELECT e.*, r.name AS rule_name, h.name AS host_name, h.host AS host_ip
+            FROM alert_events e
+            LEFT JOIN alert_rules r ON e.rule_id = r.id
+            LEFT JOIN hosts h ON e.host_id = h.id
+            {where_clause}
+            ORDER BY e.triggered_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(params + [page_size, offset]),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [dict(row) for row in rows], total
+    finally:
+        await conn.close()
+
+
+async def get_alert_event_by_id(event_id: int) -> dict[str, Any] | None:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT e.*, r.name AS rule_name, h.name AS host_name, h.host AS host_ip
+            FROM alert_events e
+            LEFT JOIN alert_rules r ON e.rule_id = r.id
+            LEFT JOIN hosts h ON e.host_id = h.id
+            WHERE e.id = ?
+            """,
+            (event_id,),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return dict(row) if row else None
+    finally:
+        await conn.close()
+
+
+async def acknowledge_alert_event(event_id: int, operator: str = "admin") -> bool:
+    from datetime import datetime
+    conn = await get_connection()
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor = await conn.execute(
+            """
+            UPDATE alert_events
+            SET status = 'acknowledged', acknowledged_at = ?, acknowledged_by = ?
+            WHERE id = ? AND status = 'alerting'
+            """,
+            (now, operator, event_id),
+        )
+        await conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def archive_alert_event(event_id: int) -> bool:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            "UPDATE alert_events SET status = 'archived' WHERE id = ?",
+            (event_id,),
+        )
+        await conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def find_active_alert(rule_id: int, host_id: int) -> dict[str, Any] | None:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            """
+            SELECT * FROM alert_events
+            WHERE rule_id = ? AND host_id = ? AND status = 'alerting'
+            ORDER BY triggered_at DESC LIMIT 1
+            """,
+            (rule_id, host_id),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return dict(row) if row else None
+    finally:
+        await conn.close()
+
+
+async def mark_alert_recovered(rule_id: int, host_id: int) -> bool:
+    from datetime import datetime
+    conn = await get_connection()
+    try:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor = await conn.execute(
+            """
+            UPDATE alert_events
+            SET status = 'recovered', recovered_at = ?
+            WHERE rule_id = ? AND host_id = ? AND status = 'alerting'
+            """,
+            (now, rule_id, host_id),
+        )
+        await conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def get_alert_stats() -> dict[str, int]:
+    conn = await get_connection()
+    try:
+        today = "datetime('now', 'start of day')"
+        cursor = await conn.execute(
+            f"""
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN severity = 'critical' THEN 1 ELSE 0 END) AS critical,
+                SUM(CASE WHEN severity = 'warning' THEN 1 ELSE 0 END) AS warning,
+                SUM(CASE WHEN severity = 'info' THEN 1 ELSE 0 END) AS info,
+                SUM(CASE WHEN status = 'recovered' THEN 1 ELSE 0 END) AS recovered
+            FROM alert_events
+            WHERE triggered_at >= {today}
+            """
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        if row:
+            return {
+                "total": row["total"] or 0,
+                "critical": row["critical"] or 0,
+                "warning": row["warning"] or 0,
+                "info": row["info"] or 0,
+                "recovered": row["recovered"] or 0,
+            }
+        return {"total": 0, "critical": 0, "warning": 0, "info": 0, "recovered": 0}
+    finally:
+        await conn.close()
+
+
+# ---- 通知渠道设置 keys ----
+NOTIFICATION_SETTING_KEYS = [
+    "dingtalk_webhook_url",
+    "dingtalk_secret",
+    "smtp_host",
+    "smtp_port",
+    "smtp_username",
+    "smtp_password",
+    "smtp_recipients",
+    "webhook_url",
+    "webhook_headers",
+    "monitor_interval",
+]
+
+
+# ---- 多服务器环境信息查询 ----
+
+async def get_hosts_env_info(host_ids: list[int]) -> list[dict[str, Any]]:
+    """查询多台服务器的环境信息（OS/发行版/主机名/IP）"""
+    if not host_ids:
+        return []
+    conn = await get_connection()
+    try:
+        placeholders = ",".join(["?"] * len(host_ids))
+        cursor = await conn.execute(
+            f"SELECT id, name, host, os_name, distro FROM hosts WHERE id IN ({placeholders})",
+            tuple(host_ids),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        results = []
+        for row in rows:
+            d = dict(row)
+            results.append({
+                "host_id": d["id"],
+                "name": d.get("name", d.get("host", "")),
+                "host": d.get("host", ""),
+                "os": d.get("os_name") or "未知",
+                "distro": d.get("distro") or "未知",
+            })
+        return results
     finally:
         await conn.close()

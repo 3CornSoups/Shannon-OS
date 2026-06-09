@@ -130,14 +130,92 @@
         </div>
       </div>
     </div>
+
+    <!-- 通知设置 -->
+    <div class="settings-card mt-6">
+      <h2 class="section-title">通知设置</h2>
+
+      <!-- 钉钉配置 -->
+      <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">钉钉机器人</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="form-label text-xs">Webhook URL</label>
+            <input v-model="notifyForm.dingtalk_webhook_url" class="input w-full" placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxx" />
+          </div>
+          <div>
+            <label class="form-label text-xs">签名密钥（可选）</label>
+            <input :type="showDingSecret ? 'text' : 'password'" v-model="notifyForm.dingtalk_secret" class="input w-full" placeholder="SEC..." />
+          </div>
+          <button @click="testNotification('dingtalk')" class="btn btn-outline text-xs" :disabled="testingChannel !== null">
+            {{ testingChannel === 'dingtalk' ? '测试中...' : '测试发送' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 邮件配置 -->
+      <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">邮件通知</h3>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label text-xs">SMTP 服务器</label>
+            <input v-model="notifyForm.smtp_host" class="input w-full" placeholder="smtp.qq.com" />
+          </div>
+          <div>
+            <label class="form-label text-xs">端口</label>
+            <input v-model="notifyForm.smtp_port" class="input w-full" placeholder="465" />
+          </div>
+          <div>
+            <label class="form-label text-xs">发件人邮箱</label>
+            <input v-model="notifyForm.smtp_username" class="input w-full" placeholder="sender@qq.com" />
+          </div>
+          <div>
+            <label class="form-label text-xs">SMTP 密码/授权码</label>
+            <input :type="showMailPwd ? 'text' : 'password'" v-model="notifyForm.smtp_password" class="input w-full" placeholder="授权码" />
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label text-xs">收件人列表（逗号分隔）</label>
+          <input v-model="notifyForm.smtp_recipients" class="input w-full" placeholder="admin@qq.com, ops@qq.com" />
+        </div>
+        <button @click="testNotification('email')" class="btn btn-outline text-xs mt-3" :disabled="testingChannel !== null">
+          {{ testingChannel === 'email' ? '测试中...' : '测试发送' }}
+        </button>
+      </div>
+
+      <!-- Webhook 配置 -->
+      <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Webhook</h3>
+        <div class="space-y-3">
+          <div>
+            <label class="form-label text-xs">回调 URL</label>
+            <input v-model="notifyForm.webhook_url" class="input w-full" placeholder="https://your-system.com/alert-callback" />
+          </div>
+          <div>
+            <label class="form-label text-xs">自定义 Headers（JSON 格式）</label>
+            <input v-model="notifyForm.webhook_headers" class="input w-full" placeholder='{"Authorization": "Bearer xxx"}' />
+          </div>
+          <button @click="testNotification('webhook')" class="btn btn-outline text-xs" :disabled="testingChannel !== null">
+            {{ testingChannel === 'webhook' ? '测试中...' : '测试发送' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button @click="saveNotificationSettings" class="btn btn-primary" :disabled="savingNotify">
+          {{ savingNotify ? '保存中...' : '保存通知设置' }}
+        </button>
+      </div>
+    </div>
   </Layout>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import Layout from '../components/layout/Layout.vue'
 import { useSettingsStore } from '../stores/settings'
 import { settingsApi } from '../services/api'
+import axios from 'axios'
 
 const settingsStore = useSettingsStore()
 
@@ -152,6 +230,50 @@ const showApiKey = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const apiTestResult = ref(null)
+
+const notifyForm = reactive({
+  dingtalk_webhook_url: '',
+  dingtalk_secret: '',
+  smtp_host: '',
+  smtp_port: '465',
+  smtp_username: '',
+  smtp_password: '',
+  smtp_recipients: '',
+  webhook_url: '',
+  webhook_headers: '',
+})
+const showDingSecret = ref(false)
+const showMailPwd = ref(false)
+const savingNotify = ref(false)
+const testingChannel = ref(null)
+
+async function loadNotificationSettings() {
+  try {
+    const res = await axios.get('/api/settings/notifications')
+    if (res.data?.ok) {
+      Object.assign(notifyForm, res.data.data)
+    }
+  } catch (e) { console.error('加载通知设置失败:', e) }
+}
+
+async function saveNotificationSettings() {
+  savingNotify.value = true
+  try {
+    await axios.put('/api/settings/notifications', notifyForm)
+    alert('通知设置已保存')
+  } catch (e) { alert('保存失败: ' + e.message) }
+  finally { savingNotify.value = false }
+}
+
+async function testNotification(channel) {
+  testingChannel.value = channel
+  try {
+    const payload = { channel, ...notifyForm }
+    const res = await axios.post('/api/settings/notifications/test', payload)
+    alert(res.data?.message || '测试完成')
+  } catch (e) { alert('测试失败: ' + e.message) }
+  finally { testingChannel.value = null }
+}
 
 // 浏览器信息
 const browserInfo = ref('')
@@ -171,6 +293,7 @@ onMounted(async () => {
   // 获取浏览器和系统信息
   browserInfo.value = navigator.userAgent
   systemInfo.value = `${navigator.platform} ${navigator.language}`
+  loadNotificationSettings()
 })
 
 // 保存设置

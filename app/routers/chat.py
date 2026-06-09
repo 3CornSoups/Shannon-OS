@@ -11,7 +11,21 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.agent import ShannonAgent
-from app.models import AgentConfig, AgentOutput, ReActCommand, ReActDone, ReActAsk
+from app.batch_executor import BatchExecutor
+from app.delegate.base import DelegationContext
+from app.delegate.claude_code import ClaudeCodeSubAgent
+from app.delegate.context_builder import build_conversation_summary, probe_remote_environment
+from app.delegate.executor import (
+    detect_available_agents,
+    get_active_delegation,
+    run_delegation,
+    cancel_delegation,
+    check_claude_installed,
+)
+from app.delegate.install import ensure_claude_code_available
+from app.delegate.reviewer import review_delegation_result
+from app.delegate.tool_detector import detect_available_tools, format_tools_for_prompt
+from app.models import AgentConfig, AgentOutput, MultiHostPayload, ReActCommand, ReActDelegate, ReActDone, ReActAsk
 from app.llm_client import extract_json, try_tool_call
 from app.prompts import build_system_prompt
 from app.database import (
@@ -23,6 +37,8 @@ from app.database import (
     create_conversation,
     get_conversation,
     get_host_context,
+    get_hosts_env_info,
+    get_latest_metrics_for_host,
     list_chat_messages,
     list_conversation_messages,
     list_conversations,
@@ -35,6 +51,21 @@ from app.executor import ExecContext, ExecutorRouter, TargetHost
 from app.settings import get_default_settings, load_runtime_settings
 
 logger = logging.getLogger(__name__)
+
+# 远程工具探测缓存：{host: tools_text}
+_tools_cache: dict[str, str] = {}
+
+async def _get_cached_tools(executor, host: str) -> str:
+    """获取缓存的远程工具列表，缓存未命中时探测"""
+    if host in _tools_cache:
+        return _tools_cache[host]
+    try:
+        tools = await detect_available_tools(executor)
+        text = format_tools_for_prompt(tools)
+        _tools_cache[host] = text
+        return text
+    except Exception:
+        return ""
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -55,6 +86,8 @@ class ChatRequest(BaseModel):
     mode: str = Field(default="chat")
     host: HostPayload
     conversation_id: int | None = None
+    hosts: list[MultiHostPayload] = Field(default_factory=list)
+    react_enabled: bool = True
 
 
 class ConfirmRequest(BaseModel):
@@ -76,14 +109,39 @@ async def _create_agent() -> ShannonAgent:
 
 # ---- ReAct 循环辅助函数 ----
 
+async def _build_metrics_text(host_id: int | None) -> str:
+    """构建系统运行状态文本，注入到 agent 提示词"""
+    if not host_id:
+        return ""
+    try:
+        metrics = await get_latest_metrics_for_host(host_id)
+        if metrics:
+            cpu = metrics.get("cpu_usage")
+            mem = metrics.get("memory_usage")
+            disk = metrics.get("disk_max_usage")
+            time_at = metrics.get("collected_at", "")
+            parts = [f"当前系统运行状态 (采集时间: {time_at}):"]
+            if cpu is not None:
+                parts.append(f"  - CPU 使用率: {cpu:.1f}%")
+            if mem is not None:
+                parts.append(f"  - 内存使用率: {mem:.1f}%")
+            if disk is not None:
+                parts.append(f"  - 磁盘最高使用率: {disk:.1f}%")
+            parts.append("请在做决策时参考以上系统运行状态信息。")
+            return "\n".join(parts)
+    except Exception:
+        pass
+    return ""
+
+
 async def _parse_first_action(
-    agent: ShannonAgent, raw_output: str, payload: ChatRequest, host_context: dict | None
+    agent: ShannonAgent, raw_output: str, payload: ChatRequest, host_context: dict | None, metrics_text: str = "", hosts_env_info: list[dict] | None = None
 ) -> ReActCommand | ReActDone | ReActAsk:
     """从流式响应中解析首个 ReAct 动作"""
     data = extract_json(raw_output)
     if not data:
         # fallback: 非流式重试
-        plan = await agent.stage2_plan_generate(payload.prompt, host_context or {}, payload.mode)
+        plan = await agent.stage2_plan_generate(payload.prompt, host_context or {}, payload.mode, metrics_text, hosts_env_info)
         if plan.commands_plan:
             first = plan.commands_plan[0]
             return ReActCommand(command=first.command, purpose=first.purpose, reasoning=plan.reasoning)
@@ -95,6 +153,8 @@ async def _parse_first_action(
         return ReActDone(**data)
     elif action_type == "ask":
         return ReActAsk(**data)
+    elif action_type == "delegate":
+        return ReActDelegate(**data)
     # 兼容旧格式：有 commands_plan 则取第一条
     commands = data.get("commands_plan", [])
     if commands:
@@ -104,10 +164,10 @@ async def _parse_first_action(
 
 
 async def _fallback_first_action(
-    agent: ShannonAgent, payload: ChatRequest, host_context: dict | None
+    agent: ShannonAgent, payload: ChatRequest, host_context: dict | None, metrics_text: str = "", hosts_env_info: list[dict] | None = None
 ) -> ReActCommand | ReActDone | ReActAsk:
     """完全 fallback：非流式生成第一个动作"""
-    plan = await agent.stage2_plan_generate(payload.prompt, host_context or {}, payload.mode)
+    plan = await agent.stage2_plan_generate(payload.prompt, host_context or {}, payload.mode, metrics_text, hosts_env_info)
     plan = agent.stage3_plan_validate(plan)
     if plan.commands_plan:
         first = plan.commands_plan[0]
@@ -116,11 +176,18 @@ async def _fallback_first_action(
 
 
 def _estimate_risk(action: ReActCommand | ReActDone | ReActAsk) -> str:
-    """使用 agent 的统一风险判断逻辑"""
-    from app.agent import assess_risk
+    """LLM 标注为主，硬阻断兜底"""
+    from app.agent import is_blocked
     if isinstance(action, ReActCommand):
-        risk, _ = assess_risk(action.command)
-        return risk
+        # LLM 自己标注的 risk_level 优先
+        llm_risk = getattr(action, "risk_level", "LOW") or "LOW"
+        if llm_risk.upper() == "HIGH":
+            return "HIGH"
+        # 硬阻断兜底：LLM 标 LOW 但命中阻断清单 → HIGH
+        blocked, _ = is_blocked(action.command)
+        if blocked:
+            return "HIGH"
+        return "LOW"
     return "LOW"
 
 
@@ -136,46 +203,62 @@ async def api_chat(payload: ChatRequest) -> Dict[str, Any]:
     host_id = host_data.pop("id", None)
     if not host_data.get("port"):
         host_data["port"] = runtime_cfg["default_ssh_port"]
-    target = TargetHost(host_id=host_id, **host_data)
+    targets: list = []
+    if payload.hosts:
+        for h in payload.hosts:
+            hd = h.model_dump()
+            hid = hd.pop("id", None)
+            t = TargetHost(host_id=hid, **hd)
+            # 从 DB 补充缺失的密码
+            if hid and (not t.password or t.password == "***"):
+                ctx = await get_host_context(hid, decrypt_pwd=True)
+                if ctx and ctx.get("last_pwd"):
+                    t.password = ctx["last_pwd"]
+            targets.append(t)
+    else:
+        targets = [TargetHost(host_id=host_id, **host_data)]
+    target = targets[0]  # 默认第一个目标，保持现有变量可用
 
     if not target.host or not target.host.strip():
         raise HTTPException(status_code=400, detail="请填写服务器地址")
     if not target.username or not target.username.strip():
         raise HTTPException(status_code=400, detail="请填写SSH用户名")
 
-    has_password = bool(target.password and target.password.strip())
-    has_key = bool(target.private_key and target.private_key.strip())
-    if not has_password and not has_key:
-        raise HTTPException(status_code=400, detail="请填写SSH密码或私钥后再执行。")
+    # 验证所有目标服务器都有密码或私钥
+    for t in targets:
+        has_password = bool(t.password and t.password.strip())
+        has_key = bool(t.private_key and t.private_key.strip())
+        if not has_password and not has_key:
+            raise HTTPException(status_code=400, detail=f"请填写 {t.name} ({t.host}) 的SSH密码或私钥后再执行。")
 
     task_id = str(uuid.uuid4())
     host_context = await get_host_context(target.host_id) if target.host_id else None
 
-    # 如果密码是掩码 ***，从 DB 加载真实密码
-    if target.password == "***" and host_context:
-        real_pwd = host_context.get("last_pwd")
-        if real_pwd and real_pwd != "***":
-            target.password = real_pwd
-
-    # 保存或更新主机信息（排除 *** 掩码值，防止覆盖真实密码）
-    if target.host_id and host_context:
-        raw_pwd = target.password.strip() if target.password else ""
-        if raw_pwd and raw_pwd != "***":
-            await upsert_host_context(
-                name=host_context["name"],
-                host=host_context["host"],
-                port=host_context["port"],
-                username=host_context["username"],
-                last_pwd=raw_pwd,
+    # 为所有目标服务器补充 *** 掩码密码和保存主机信息
+    for t in targets:
+        ctx = await get_host_context(t.host_id, decrypt_pwd=True) if t.host_id else None
+        if t.password == "***" and ctx:
+            real_pwd = ctx.get("last_pwd")
+            if real_pwd and real_pwd != "***":
+                t.password = real_pwd
+        if t.host_id and ctx:
+            raw_pwd = t.password.strip() if t.password else ""
+            if raw_pwd and raw_pwd != "***":
+                await upsert_host_context(
+                    name=ctx["name"],
+                    host=ctx["host"],
+                    port=ctx["port"],
+                    username=ctx["username"],
+                    last_pwd=raw_pwd,
+                )
+        elif not t.host_id:
+            t.host_id = await upsert_host_context(
+                name=t.name,
+                host=t.host,
+                port=t.port,
+                username=t.username,
+                last_pwd=t.password.strip() if t.password else None,
             )
-    else:
-        target.host_id = await upsert_host_context(
-            name=target.name,
-            host=target.host,
-            port=target.port,
-            username=target.username,
-            last_pwd=target.password.strip() if target.password else None,
-        )
 
     # 会话管理
     conversation_id = payload.conversation_id
@@ -200,7 +283,7 @@ async def api_chat(payload: ChatRequest) -> Dict[str, Any]:
                 await update_conversation_title(conversation_id, title)
 
     asyncio.create_task(
-        _handle_chat_task(task_id, payload, target, host_context, conversation_id)
+        _handle_chat_task(task_id, payload, targets, host_context, conversation_id)
     )
     return {"task_id": task_id, "status": "accepted", "conversation_id": conversation_id}
 
@@ -208,12 +291,20 @@ async def api_chat(payload: ChatRequest) -> Dict[str, Any]:
 async def _handle_chat_task(
     task_id: str,
     payload: ChatRequest,
-    target: TargetHost,
+    targets: list,
     host_context: Dict[str, Any] | None,
     conversation_id: int | None = None,
 ):
     try:
         current_agent = await _create_agent()
+
+        hosts_env_info = []
+        if len(targets) > 1:
+            host_ids = [t.host_id for t in targets if t.host_id]
+            if host_ids:
+                hosts_env_info = await get_hosts_env_info(host_ids)
+
+        target = targets[0]
 
         # 加载历史消息到 ConversationManager
         # 注意：用户消息已由 api_chat 存入 DB，历史中已包含
@@ -225,13 +316,36 @@ async def _handle_chat_task(
                 elif msg["role"] == "assistant":
                     current_agent.conversation.add_assistant_message(msg["content"])
 
+        # 委托冲突检查：如果当前有委托正在执行，通知前端
+        active_del = get_active_delegation(target.host_id, conversation_id)
+        if active_del and payload.mode in ("agent", "auto"):
+            await event_store.emit(task_id, {
+                "type": "delegation_conflict",
+                "existing_task_id": active_del.task_id,
+                "message": "有一个委托任务正在执行中。",
+            })
+            # 将新任务加入排队，前端让用户选择
+            active_del.queued_messages.append({
+                "task_id": task_id,
+                "payload": payload.model_dump(),
+                "targets": [t.__dict__ for t in targets],
+                "host_context": host_context,
+                "conversation_id": conversation_id,
+            })
+            # 不发 done 事件，保持 SSE 连接存活，等待冲突解决
+            # 冲突解决后（cancel_and_new），后端用同一 task_id 重新生成消息
+            return
+
         await event_store.emit(task_id, {"type": "status", "message": "正在分析意图..."})
+
+        # 获取最新系统运行状态，注入到 agent 提示词中
+        metrics_text = await _build_metrics_text(target.host_id)
 
         # 构建系统提示词
         if payload.mode == "chat":
             # 纯聊天模式：直接流式回复，不解析 JSON/命令
             system_prompt = current_agent._build_system_prompt(
-                "chat", host_context or {}, stage="chat"
+                "chat", host_context or {}, stage="chat", metrics_text=metrics_text, hosts_context=hosts_env_info
             )
             current_agent.conversation.set_system_prompt(system_prompt)
 
@@ -255,9 +369,18 @@ async def _handle_chat_task(
             )
             return
 
-        # agent 模式：意图分析与计划生成
+        # 委托由 LLM 通过 delegate_task 工具自主决策（ADR-0005）
+
+        # 探测远程服务器可用 CLI 工具（首次探测后缓存）
+        available_tools_text = ""
+        if payload.mode != "chat":
+            from app.executor import ExecutorRouter as _ExecutorRouter
+            _probe_executor = _ExecutorRouter.create_executor(target)
+            available_tools_text = await _get_cached_tools(_probe_executor, target.host)
+
+        # agent / auto 模式：意图分析与计划生成
         system_prompt = current_agent._build_system_prompt(
-            payload.mode, host_context or {}, stage="plan"
+            payload.mode, host_context or {}, stage="plan", metrics_text=metrics_text, hosts_context=hosts_env_info, available_tools_text=available_tools_text
         )
         current_agent.conversation.set_system_prompt(system_prompt)
 
@@ -267,7 +390,7 @@ async def _handle_chat_task(
 
         # 优先尝试 tool calling 获取结构化输出
         first_action = await current_agent._request_first_action(
-            payload.prompt, host_context or {}, payload.mode
+            payload.prompt, host_context or {}, payload.mode, metrics_text, hosts_env_info, available_tools_text
         )
 
         if first_action is None:
@@ -300,9 +423,9 @@ async def _handle_chat_task(
             raw_output = "".join(full_response)
 
             # 尝试从流式响应中解析 ReAct 动作
-            first_action = await _parse_first_action(current_agent, raw_output, payload, host_context)
+            first_action = await _parse_first_action(current_agent, raw_output, payload, host_context, metrics_text, hosts_env_info)
             if first_action is None:
-                first_action = await _fallback_first_action(current_agent, payload, host_context)
+                first_action = await _fallback_first_action(current_agent, payload, host_context, metrics_text, hosts_env_info)
         else:
             # tool calling 成功，将结构化的内容流式输出给前端
             action_json = json.dumps(first_action.model_dump(), ensure_ascii=False)
@@ -330,46 +453,69 @@ async def _handle_chat_task(
             )
             return
 
-        # agent 模式：等待用户确认执行
-        if payload.mode == "agent":
+        # 委托处理：LLM 决定委托任务给子智能体
+        if isinstance(first_action, ReActDelegate):
+            await _handle_delegation_flow(
+                task_id, first_action, target, targets, host_context,
+                payload, current_agent, conversation_id,
+            )
+            return
+
+        # agent / auto 模式：根据风险等级决定是否等待用户确认
+        # agent 模式：风险正常判定，但无论 HIGH/LOW 都需要用户确认
+        # auto 模式：LOW 自动执行，HIGH 等待确认
+        if payload.mode in ("agent", "auto"):
+            assessed_risk = _estimate_risk(first_action)
+            need_confirm = (payload.mode == "agent") or (assessed_risk == "HIGH")
             reason = first_action.reasoning or "请确认执行以下操作"
-            # 构造展示用 plan 事件（兼容前端确认对话框）
             action_display = first_action.model_dump()
             await event_store.emit(task_id, {
                 "type": "plan",
                 "intent": "executing_task",
-                "risk_level": _estimate_risk(first_action),
+                "risk_level": assessed_risk,
                 "reasoning": first_action.reasoning,
                 "reply_message": first_action.message if hasattr(first_action, "message") else "",
                 "commands_plan": [{"command": action_display.get("command", ""), "purpose": action_display.get("purpose", "")}],
             })
-            wait_event = asyncio.Event()
-            pending_events[task_id] = wait_event
-            pending_confirmations[task_id] = {
-                "target": target, "host_id": target.host_id,
-                "host_context": host_context, "mode": payload.mode,
-                "wait_event": wait_event, "risk_level": _estimate_risk(first_action),
-            }
-            await append_audit_record(
-                host_id=target.host_id, task_id=task_id, reason=reason,
-                risk_level="LOW", approved=False, operator_name=None,
-            )
-            await event_store.emit(task_id, {"type": "risk_hold", "reason": reason, "task_id": task_id,
-                                              "risk_level": "LOW",
-                                              "commands_plan": [{"command": action_display.get("command", ""), "purpose": action_display.get("purpose", "")}]})
-            try:
-                await asyncio.wait_for(wait_event.wait(), timeout=600)
-            except asyncio.TimeoutError:
-                pending_confirmations.pop(task_id, None)
+            if need_confirm:
+                wait_event = asyncio.Event()
+                pending_events[task_id] = wait_event
+                pending_confirmations[task_id] = {
+                    "target": target, "host_id": target.host_id,
+                    "host_context": host_context, "mode": payload.mode,
+                    "wait_event": wait_event, "risk_level": assessed_risk,
+                }
+                await append_audit_record(
+                    host_id=target.host_id, task_id=task_id, reason=reason,
+                    risk_level=assessed_risk, approved=False, operator_name=None,
+                )
+                await event_store.emit(task_id, {"type": "risk_hold", "reason": reason, "task_id": task_id,
+                                                  "risk_level": assessed_risk,
+                                                  "commands_plan": [{"command": action_display.get("command", ""), "purpose": action_display.get("purpose", "")}]})
+                try:
+                    await asyncio.wait_for(wait_event.wait(), timeout=600)
+                except asyncio.TimeoutError:
+                    pending_confirmations.pop(task_id, None)
+                    pending_events.pop(task_id, None)
+                    current_agent.conversation.add_assistant_message("[已取消 — 确认超时]")
+                    await event_store.emit(task_id, {"type": "done", "message": "确认超时，已自动取消。"})
+                    return
+                pending = pending_confirmations.pop(task_id, None)
                 pending_events.pop(task_id, None)
-                await event_store.emit(task_id, {"type": "done", "message": "确认超时，已自动取消。"})
-                return
-            pending_confirmations.pop(task_id, None)
-            pending_events.pop(task_id, None)
+                if not pending or not pending.get("confirmed"):
+                    current_agent.conversation.add_assistant_message("[已取消 — 用户拒绝执行]")
+                    await event_store.emit(task_id, {"type": "done", "message": "已取消执行。"})
+                    return
+            else:
+                # auto 模式 + 低风险：自动执行，无需用户确认
+                await append_audit_record(
+                    host_id=target.host_id, task_id=task_id, reason=reason,
+                    risk_level=assessed_risk, approved=True, operator_name="auto",
+                )
 
         # 切换为 ReAct 系统提示词
         react_prompt = current_agent._build_system_prompt(
-            payload.mode, host_context or {}, stage="react"
+            payload.mode, host_context or {}, stage="react", metrics_text=metrics_text, hosts_context=hosts_env_info, available_tools_text=available_tools_text
         )
         current_agent.conversation.set_system_prompt(react_prompt)
 
@@ -381,12 +527,53 @@ async def _handle_chat_task(
             json.dumps(first_action.model_dump(), ensure_ascii=False)
         )
 
-        executor = ExecutorRouter.create_executor(target)
-        max_iterations = 20
+        is_multi_target = len(targets) > 1
+        if is_multi_target:
+            batch_executor = BatchExecutor(targets)
+        executor = ExecutorRouter.create_executor(target) if not is_multi_target else None
+        max_iterations = 40
         iteration = 0
         accumulated_stdout = []
         accumulated_stderr = []
         final_reply = first_action.message if hasattr(first_action, "message") else ""
+
+        # ReAct 关闭模式：直接使用 BatchExecutor 一次性执行命令计划，不走 LLM 循环推理
+        if payload.mode in ("agent", "auto") and not payload.react_enabled:
+            if isinstance(first_action, ReActCommand) and first_action.command:
+                # 一次性执行所有命令
+                all_results: dict[str, list] = {}
+                # 如果是 ReActCommand，把当前命令作为计划执行
+                if is_multi_target:
+                    await event_store.emit(task_id, {"type": "command_start", "command": first_action.command,
+                                                      "purpose": first_action.purpose, "reasoning": first_action.reasoning})
+                    is_download = any(kw in first_action.command for kw in ["wget", "curl", "git clone", "tar"])
+                    timeout = 300 if is_download else 60
+                    ctx = ExecContext(timeout_sec=timeout)
+                    results = await batch_executor.run_command(first_action.command, ctx)
+                    for hid, r in results.items():
+                        host = next((t for t in targets if t.host_id == hid), None)
+                        hname = host.name if host else f"Host-{hid}"
+                        await event_store.emit(task_id, {"type": "command_result", "command": first_action.command,
+                                                          "host_id": hid, "host_name": hname,
+                                                          "stdout": r.stdout, "stderr": r.stderr, "returncode": r.returncode})
+                        all_results.setdefault(str(hid), []).append({
+                            "host_name": hname,
+                            "stdout": r.stdout or "", "stderr": r.stderr or "", "returncode": r.returncode,
+                        })
+                else:
+                    await event_store.emit(task_id, {"type": "command_start", "command": first_action.command,
+                                                      "purpose": first_action.purpose, "reasoning": first_action.reasoning})
+                    is_download = any(kw in first_action.command for kw in ["wget", "curl", "git clone", "tar"])
+                    timeout = 300 if is_download else 60
+                    result = await executor.run(first_action.command, ExecContext(timeout_sec=timeout))
+                    await event_store.emit(task_id, {"type": "command_result", "command": first_action.command,
+                                                      "host_id": target.host_id, "host_name": target.name,
+                                                      "stdout": result.stdout, "stderr": result.stderr, "returncode": result.returncode})
+                final_msg = "命令已执行完成。"
+                await event_store.emit(task_id, {"type": "done", "message": final_msg})
+            else:
+                await event_store.emit(task_id, {"type": "done", "message": first_action.message if hasattr(first_action, "message") else "已生成计划。"})
+            return
 
         while iteration < max_iterations:
             iteration += 1
@@ -411,44 +598,62 @@ async def _handle_chat_task(
                 is_download = any(kw in cmd for kw in ["wget", "curl", "git clone", "tar"])
                 timeout = 300 if is_download else 60
 
-                async def on_output(line: str, is_stderr: bool, _cmd=cmd):
-                    try:
-                        await event_store.emit(task_id, {"type": "command_output", "command": _cmd, "line": line, "is_stderr": is_stderr})
-                    except Exception:
-                        pass
-
                 try:
-                    result = await executor.run(cmd, ExecContext(timeout_sec=timeout, on_output=on_output))
-                    await event_store.emit(task_id, {"type": "command_result", "command": cmd,
-                                                      "stdout": result.stdout, "stderr": result.stderr,
-                                                      "returncode": result.returncode})
-                    accumulated_stdout.append(result.stdout or "")
-                    accumulated_stderr.append(result.stderr or "")
-
-                    # 保存命令结果到 DB
-                    if target.host_id:
-                        result_summary = f"返回码: {result.returncode}"
-                        if result.stdout:
-                            result_summary += f"\n标准输出: {(result.stdout[:500])}"
-                        if result.stderr:
-                            result_summary += f"\n错误输出: {(result.stderr[:500])}"
-                        await append_chat_message(
-                            target.host_id, "assistant",
-                            result_summary,
-                            {"type": "react_result", "command": cmd, "returncode": result.returncode,
-                             "stdout": result.stdout, "stderr": result.stderr},
-                            conversation_id=conversation_id,
+                    if is_multi_target:
+                        # 多服务器：使用 BatchExecutor 并行执行
+                        ctx = ExecContext(timeout_sec=timeout)
+                        batch_results = await batch_executor.run_command(cmd, ctx)
+                        for hid, r in batch_results.items():
+                            host = next((t for t in targets if t.host_id == hid), None)
+                            hname = host.name if host else f"Host-{hid}"
+                            await event_store.emit(task_id, {"type": "command_result", "command": cmd,
+                                                              "host_id": hid, "host_name": hname,
+                                                              "stdout": r.stdout, "stderr": r.stderr, "returncode": r.returncode})
+                            accumulated_stdout.append(f"[{hname}] {r.stdout or ''}")
+                            if r.stderr:
+                                accumulated_stderr.append(f"[{hname}] {r.stderr}")
+                        # 将聚合结果反馈给 LLM
+                        combined = "\n".join(
+                            f"[{next((t.name for t in targets if t.host_id == hid), hid)}]\n{r.stdout or '(空)'}"
+                            for hid, r in batch_results.items()
                         )
+                        current_agent.conversation.add_tool_result(
+                            cmd, 0 if all(r.returncode == 0 for r in batch_results.values()) else 1,
+                            combined, ""
+                        )
+                    else:
+                        result = await executor.run(cmd, ExecContext(timeout_sec=timeout))
+                        await event_store.emit(task_id, {"type": "command_result", "command": cmd,
+                                                          "host_id": target.host_id, "host_name": target.name,
+                                                          "stdout": result.stdout, "stderr": result.stderr,
+                                                          "returncode": result.returncode})
+                        accumulated_stdout.append(result.stdout or "")
+                        accumulated_stderr.append(result.stderr or "")
 
-                    # 将执行结果反馈给 LLM
-                    current_agent.conversation.add_tool_result(cmd, result.returncode, result.stdout, result.stderr)
+                        # 保存命令结果到 DB
+                        if target.host_id:
+                            result_summary = f"返回码: {result.returncode}"
+                            if result.stdout:
+                                result_summary += f"\n标准输出: {(result.stdout[:500])}"
+                            if result.stderr:
+                                result_summary += f"\n错误输出: {(result.stderr[:500])}"
+                            await append_chat_message(
+                                target.host_id, "assistant",
+                                result_summary,
+                                {"type": "react_result", "command": cmd, "returncode": result.returncode,
+                                 "stdout": result.stdout, "stderr": result.stderr},
+                                conversation_id=conversation_id,
+                            )
+
+                        # 将执行结果反馈给 LLM
+                        current_agent.conversation.add_tool_result(cmd, result.returncode, result.stdout, result.stderr)
 
                 except Exception as exc:
                     error_msg = str(exc)
                     accumulated_stderr.append(error_msg)
                     await event_store.emit(task_id, {"type": "command_result", "command": cmd,
                                                       "stdout": None, "stderr": error_msg, "returncode": -1})
-                    if target.host_id:
+                    if not is_multi_target and target.host_id:
                         await append_chat_message(
                             target.host_id, "assistant",
                             f"命令执行异常: {error_msg}",
@@ -456,6 +661,13 @@ async def _handle_chat_task(
                             conversation_id=conversation_id,
                         )
                     current_agent.conversation.add_tool_result(cmd, -1, "", error_msg)
+
+            elif isinstance(first_action, ReActDelegate):
+                await _handle_delegation_flow(
+                    task_id, first_action, target, targets, host_context,
+                    payload, current_agent, conversation_id,
+                )
+                break
 
             elif isinstance(first_action, ReActDone):
                 final_reply = first_action.message
@@ -467,6 +679,15 @@ async def _handle_chat_task(
                 await event_store.emit(task_id, {"type": "react_ask", "message": final_reply, "reasoning": first_action.reasoning})
                 break
 
+            # 刷新系统运行状态并重建 system prompt
+            fresh_metrics = await _build_metrics_text(target.host_id)
+            if fresh_metrics != metrics_text:
+                react_prompt = current_agent._build_system_prompt(
+                    payload.mode, host_context or {}, stage="react", metrics_text=fresh_metrics, hosts_context=hosts_env_info, available_tools_text=available_tools_text
+                )
+                current_agent.conversation.set_system_prompt(react_prompt)
+                metrics_text = fresh_metrics
+
             # 调用 LLM 获取下一步动作
             try:
                 first_action = await current_agent._request_react_action()
@@ -474,6 +695,38 @@ async def _handle_chat_task(
                 final_reply = f"LLM 调用失败: {exc}"
                 await event_store.emit(task_id, {"type": "error", "message": final_reply})
                 break
+
+            # 每轮迭代风险检查（首轮已在循环外查过，但 ReAct 重新生成 action 后需复查）
+            if isinstance(first_action, ReActCommand) and first_action.command:
+                assessed_risk = _estimate_risk(first_action)
+                if payload.mode == "agent" or assessed_risk == "HIGH":
+                    reason = first_action.reasoning or "请确认执行以下命令"
+                    await event_store.emit(task_id, {"type": "risk_hold", "reason": reason, "task_id": task_id,
+                                                      "risk_level": assessed_risk,
+                                                      "commands_plan": [{"command": first_action.command, "purpose": first_action.purpose}]})
+                    wait_event = asyncio.Event()
+                    pending_events[task_id] = wait_event
+                    pending_confirmations[task_id] = {
+                        "target": target, "host_id": target.host_id,
+                        "host_context": host_context, "mode": payload.mode,
+                        "wait_event": wait_event, "risk_level": assessed_risk,
+                    }
+                    try:
+                        await asyncio.wait_for(wait_event.wait(), timeout=600)
+                    except asyncio.TimeoutError:
+                        pending_confirmations.pop(task_id, None)
+                        pending_events.pop(task_id, None)
+                        current_agent.conversation.add_assistant_message("[已取消 — 确认超时]")
+                        final_reply = "确认超时，已自动取消。"
+                        await event_store.emit(task_id, {"type": "done", "message": final_reply})
+                        break
+                    pending = pending_confirmations.pop(task_id, None)
+                    pending_events.pop(task_id, None)
+                    if not pending or not pending.get("confirmed"):
+                        current_agent.conversation.add_assistant_message("[已取消 — 用户拒绝执行]")
+                        final_reply = "已取消执行。"
+                        await event_store.emit(task_id, {"type": "done", "message": final_reply})
+                        break
 
         else:
             final_reply = f"已达到最大迭代次数 ({max_iterations})，执行终止。"
@@ -508,6 +761,279 @@ async def _handle_chat_task(
             await append_chat_message(
                 target.host_id, "assistant", f"错误: {error_msg}", conversation_id=conversation_id,
             )
+
+
+async def _handle_delegation_flow(
+    task_id: str,
+    action: ReActDelegate,
+    target,
+    targets: list,
+    host_context: dict | None,
+    payload,
+    current_agent,
+    conversation_id: int | None = None,
+):
+    """处理委托流程：确认 → 执行 → 审核 → 融入对话"""
+    import time as time_module
+
+    # 1. 风险判断
+    risk_level = action.risk_level.upper()
+
+    # HIGH 风险 → 等待用户确认（预判器 + LLM 共同决策后，由用户最终确认）
+    if risk_level == "HIGH":
+        await event_store.emit(task_id, {
+            "type": "delegate_confirm_required",
+            "agent": action.target_agent,
+            "reason": action.reason,
+            "risk_level": risk_level,
+            "task": action.context_for_delegate,
+        })
+        wait_event = asyncio.Event()
+        pending_events[task_id] = wait_event
+        pending_confirmations[task_id] = {
+            "target": target, "host_id": target.host_id,
+            "host_context": host_context, "mode": payload.mode,
+            "wait_event": wait_event, "risk_level": risk_level,
+            "is_delegation": True,
+        }
+        await append_audit_record(
+            host_id=target.host_id, task_id=task_id, reason=action.reason,
+            risk_level=risk_level, approved=False, operator_name=None,
+        )
+        try:
+            await asyncio.wait_for(wait_event.wait(), timeout=600)
+        except asyncio.TimeoutError:
+            pending_confirmations.pop(task_id, None)
+            pending_events.pop(task_id, None)
+            await event_store.emit(task_id, {
+                "type": "done",
+                "message": "委托确认超时，已自动取消。退回 Agent 模式处理。",
+            })
+            await _fallback_to_agent(task_id, target, host_context, payload, current_agent, conversation_id)
+            return
+        pending = pending_confirmations.pop(task_id, None)
+        pending_events.pop(task_id, None)
+        if not pending or not pending.get("confirmed"):
+            await event_store.emit(task_id, {
+                "type": "delegate_fallback",
+                "message": "用户拒绝委托，退回 Agent 模式。",
+            })
+            await _fallback_to_agent(task_id, target, host_context, payload, current_agent, conversation_id)
+            return
+    else:
+        await append_audit_record(
+            host_id=target.host_id, task_id=task_id, reason=action.reason,
+            risk_level=risk_level, approved=True, operator_name="auto",
+        )
+
+    # 2. 创建 SSH executor
+    from app.executor import ExecutorRouter
+    executor = ExecutorRouter.create_executor(target)
+
+    # 3. 检查 Claude Code 是否安装
+    claude_ok = await check_claude_installed(executor)
+    if not claude_ok:
+        await event_store.emit(task_id, {
+            "type": "delegate_install_required",
+            "host_name": target.name,
+            "message": f"目标服务器 {target.name} 上未安装 Claude Code CLI，是否自动安装？",
+        })
+        wait_event = asyncio.Event()
+        pending_events[f"install_{task_id}"] = wait_event
+        pending_confirmations[f"install_{task_id}"] = {
+            "target": target, "host_id": target.host_id,
+            "wait_event": wait_event, "is_install": True,
+        }
+        try:
+            await asyncio.wait_for(wait_event.wait(), timeout=300)
+        except asyncio.TimeoutError:
+            pending_confirmations.pop(f"install_{task_id}", None)
+            pending_events.pop(f"install_{task_id}", None)
+            await event_store.emit(task_id, {
+                "type": "delegate_fallback",
+                "message": "安装确认超时，退回 Agent 模式。",
+            })
+            await _fallback_to_agent(task_id, target, host_context, payload, current_agent, conversation_id)
+            return
+        install_pending = pending_confirmations.pop(f"install_{task_id}", None)
+        pending_events.pop(f"install_{task_id}", None)
+        if not install_pending or not install_pending.get("confirmed"):
+            await event_store.emit(task_id, {
+                "type": "delegate_fallback",
+                "message": "用户拒绝安装，退回 Agent 模式。",
+            })
+            await _fallback_to_agent(task_id, target, host_context, payload, current_agent, conversation_id)
+            return
+        # 执行安装
+        ok, msg, report = await ensure_claude_code_available(executor)
+        if not ok:
+            await event_store.emit(task_id, {
+                "type": "delegate_fallback",
+                "message": f"安装失败: {msg}，退回 Agent 模式。",
+            })
+            await _fallback_to_agent(task_id, target, host_context, payload, current_agent, conversation_id)
+            return
+        await event_store.emit(task_id, {
+            "type": "status",
+            "message": f"Claude Code 安装完成: {msg}",
+        })
+
+    # 4. 探测服务器环境
+    host_info = await probe_remote_environment(executor) or {}
+
+    # 5. 生成对话摘要
+    messages = current_agent.conversation.get_messages()
+    settings = await load_runtime_settings()
+    summary = await build_conversation_summary(
+        settings.get("api_base", "https://api.deepseek.com"),
+        settings.get("api_key", ""),
+        settings.get("api_model", "deepseek-chat"),
+        messages,
+    )
+
+    # 6. 确定工作目录
+    work_dir = action.work_dir or host_context.get("cwd") if host_context else None
+
+    # 7. 构建委托上下文并执行
+    ctx = DelegationContext(
+        user_input=payload.prompt,
+        host_info=host_info,
+        work_dir=work_dir,
+        conversation_summary=summary,
+        task_id=task_id,
+        risk_level=risk_level,
+    )
+
+    # 在 run_delegation 前捕获排队消息（其 finally 会清理 session）
+    active_before = get_active_delegation(target.host_id, conversation_id)
+    queued_before = list(active_before.queued_messages) if active_before else []
+
+    sub_agent = ClaudeCodeSubAgent()
+    result = await run_delegation(
+        sub_agent, action.context_for_delegate, ctx, executor,
+        event_store, target.host_id, conversation_id,
+    )
+
+    # 用户取消委托 → 退回基础 Agent 继续执行
+    if result.cancelled:
+        await event_store.emit(task_id, {
+            "type": "delegate_fallback",
+            "message": "委托已取消，退回 Agent 模式继续执行。",
+        })
+        await _fallback_to_agent(task_id, target, host_context, payload, current_agent, conversation_id)
+        return
+
+    # 8. 审核委托结果
+    review = await review_delegation_result(
+        settings.get("api_base", "https://api.deepseek.com"),
+        settings.get("api_key", ""),
+        settings.get("api_model", "deepseek-chat"),
+        payload.prompt,
+        result.stdout or "",
+        result.exit_code,
+        result.execution_time_sec,
+        stderr=result.stderr or "",
+    )
+
+    await event_store.emit(task_id, {
+        "type": "delegate_review",
+        "goal_achieved": review.get("goal_achieved", "⚠️ 部分达成"),
+        "goal_reasoning": review.get("goal_reasoning", ""),
+        "exit_code": review.get("exit_code"),
+        "exit_ok": review.get("exit_ok", False),
+        "execution_time_sec": review.get("execution_time_sec"),
+        "files_changed": review.get("files_changed", []),
+        "risk_warnings": review.get("risk_warnings", []),
+        "output_summary": review.get("output_summary", ""),
+        "stderr": review.get("stderr", ""),
+    })
+
+    # 9. 融入对话上下文
+    summary_text = f"[委托执行结果 - {sub_agent.display_name}]\n{review.get('output_summary', '')}"
+    current_agent.conversation.add_assistant_message(summary_text)
+
+    # 10. 写入操作日志
+    await append_operation_log(
+        host_id=target.host_id, mode="delegate", intent="delegation",
+        commands_plan=[{
+            "agent": action.target_agent,
+            "task": action.context_for_delegate,
+            "reason": action.reason,
+            "risk_level": risk_level,
+            "exit_code": result.exit_code,
+            "goal_achieved": review.get("goal_achieved"),
+            "execution_time_sec": result.execution_time_sec,
+            "files_changed": review.get("files_changed", []),
+            "cancelled": result.cancelled,
+            "timed_out": result.timed_out,
+        }],
+        risk_level=risk_level,
+        status="completed" if not result.cancelled else "cancelled",
+        stdout=result.stdout[:2000] if result.stdout else None,
+        stderr=result.stderr[:1000] if result.stderr else None,
+        exit_code=result.exit_code,
+        task_id=task_id,
+    )
+
+    # 11. 保存委托结果到聊天记录
+    if target.host_id:
+        final_msg = (
+            f"**🧠 智能委托 - {sub_agent.display_name}**\n\n"
+            f"**目标达成:** {review.get('goal_achieved', '⚠️ 部分达成')}\n"
+            f"**耗时:** {result.execution_time_sec:.1f}秒\n"
+            f"**变更文件:** {len(review.get('files_changed', []))}个\n"
+        )
+        if review.get("risk_warnings"):
+            final_msg += f"\n⚠️ **风险警告:** {', '.join(review['risk_warnings'])}"
+        final_msg += f"\n\n{review.get('output_summary', '')[:2000]}"
+        await append_chat_message(
+            target.host_id, "assistant", final_msg,
+            conversation_id=conversation_id,
+        )
+
+    await event_store.emit(task_id, {
+        "type": "done",
+        "message": f"委托执行完成 - {review.get('goal_achieved', '⚠️ 部分达成')}",
+    })
+
+    # 12. 处理排队消息（使用 run_delegation 前捕获的副本）
+    for queued in queued_before:
+        await event_store.emit(queued["task_id"], {
+            "type": "status",
+            "message": "上一个委托已完成，正在处理排队任务...",
+        })
+        asyncio.create_task(
+            _handle_chat_task(
+                queued["task_id"],
+                ChatRequest(**queued["payload"]),
+                [TargetHost(**t) for t in queued["targets"]],
+                queued["host_context"],
+                queued["conversation_id"],
+            )
+        )
+
+
+async def _fallback_to_agent(
+    task_id: str, target, host_context: dict | None,
+    payload, current_agent, conversation_id: int | None = None,
+):
+    """委托拒绝/失败后回退到正常 Agent 流程"""
+    # 简化回退：用非委托模式重新生成回复
+    system_prompt = current_agent._build_system_prompt(
+        payload.mode, host_context or {}, stage="plan", metrics_text="",
+        hosts_context=None,
+    )
+    current_agent.conversation.set_system_prompt(system_prompt)
+    try:
+        plan = await current_agent.stage2_plan_generate(payload.prompt, host_context or {}, payload.mode)
+        reply = plan.reply_message or "已退回 Agent 模式处理，请重新描述您的需求。"
+    except Exception:
+        reply = "委托已取消，请重新描述您的需求。"
+    await event_store.emit(task_id, {"type": "done", "message": reply})
+    if target.host_id:
+        await append_chat_message(
+            target.host_id, "assistant", reply, conversation_id=conversation_id,
+        )
 
 
 async def _execute_plan(
@@ -717,13 +1243,205 @@ async def api_stream(task_id: str) -> StreamingResponse:
 
         try:
             while True:
-                data = await asyncio.wait_for(queue.get(), timeout=600)
-                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-                if data.get("type") in ("done", "error"):
-                    break
-        except asyncio.TimeoutError:
-            yield f"data: {json.dumps({'type': 'error', 'message': '连接超时'}, ensure_ascii=False)}\n\n"
+                try:
+                    data = await asyncio.wait_for(queue.get(), timeout=15)
+                    yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    if data.get("type") in ("done", "error"):
+                        break
+                except asyncio.TimeoutError:
+                    # 每 15s 发心跳注释，防止反向代理/Uvicorn 断开空闲连接
+                    yield ": heartbeat\n\n"
         finally:
             event_store.unsubscribe(task_id)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+class ExecutePlanRequest(BaseModel):
+    commands: list[dict]
+    hosts: list[MultiHostPayload]
+
+
+@router.post("/chat/execute-plan")
+async def api_execute_plan(payload: ExecutePlanRequest) -> dict:
+    """接收命令计划 + hosts 列表，走 BatchExecutor 直接执行（不走 LLM）"""
+    from app.executor import ExecContext
+
+    targets = []
+    for h in payload.hosts:
+        hd = h.model_dump()
+        hd.pop("id", None)
+        targets.append(TargetHost(**hd))
+
+    batch = BatchExecutor(targets)
+    results = {}
+    for cmd_item in payload.commands:
+        cmd = cmd_item.get("command", "")
+        if not cmd:
+            continue
+        ctx = ExecContext(timeout_sec=60)
+        cmd_results = await batch.run_command(cmd, ctx)
+        for host_id, result in cmd_results.items():
+            if host_id not in results:
+                results[host_id] = []
+            results[host_id].append({
+                "command": cmd,
+                "purpose": cmd_item.get("purpose", ""),
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "returncode": result.returncode,
+            })
+
+    return {"ok": True, "data": {"results": results}}
+
+
+# ── 委托相关 API ──
+
+
+class DelegateCancelRequest(BaseModel):
+    task_id: str
+
+
+class DelegateInstallRequest(BaseModel):
+    host: HostPayload
+
+
+class DelegateConflictResolveRequest(BaseModel):
+    task_id: str
+    action: str  # "cancel_and_new" | "queue"
+
+
+@router.post("/delegate/cancel")
+async def api_delegate_cancel(payload: DelegateCancelRequest) -> dict[str, Any]:
+    """取消正在执行的委托任务"""
+    # 查找所有活跃委托中匹配的
+    from app.delegate.executor import _active_delegations
+
+    cancelled = False
+    for key, session in list(_active_delegations.items()):
+        if session.task_id == payload.task_id:
+            session.cancel_event.set()
+            try:
+                await session.agent.cancel()
+            except Exception:
+                pass
+            cancelled = True
+            break
+
+    if not cancelled:
+        raise HTTPException(status_code=404, detail="未找到活跃的委托任务")
+
+    await event_store.emit(payload.task_id, {
+        "type": "delegate_cancelled",
+        "message": "委托已被用户取消",
+    })
+    return {"task_id": payload.task_id, "status": "cancelled"}
+
+
+@router.post("/delegate/confirm-install")
+async def api_delegate_confirm_install(payload: ConfirmRequest) -> dict[str, Any]:
+    """确认或拒绝安装 Claude Code"""
+    install_key = f"install_{payload.task_id}"
+    pending = pending_confirmations.get(install_key)
+    if not pending:
+        raise HTTPException(status_code=404, detail="安装确认请求未找到")
+
+    wait_event = pending.get("wait_event")
+    if not wait_event:
+        raise HTTPException(status_code=404, detail="事件未找到")
+
+    if not payload.force_execute:
+        pending["confirmed"] = False
+        wait_event.set()
+        return {"task_id": payload.task_id, "status": "install_rejected"}
+
+    pending["confirmed"] = True
+    wait_event.set()
+    return {"task_id": payload.task_id, "status": "install_confirmed"}
+
+
+@router.post("/delegate/resolve-conflict")
+async def api_delegate_resolve_conflict(payload: DelegateConflictResolveRequest) -> dict[str, Any]:
+    """解决委托冲突：取消当前委托 + 执行新任务，或排队等待"""
+    from app.delegate.executor import _active_delegations, get_active_delegation
+
+    # 找到相关的活跃委托
+    active_session = None
+    active_key = None
+    for key, session in _active_delegations.items():
+        if any(
+            q.get("task_id") == payload.task_id
+            for q in session.queued_messages
+        ):
+            active_session = session
+            active_key = key
+            break
+
+    if not active_session:
+        raise HTTPException(status_code=404, detail="未找到冲突的委托任务")
+
+    if payload.action == "cancel_and_new":
+        # 取消当前委托
+        active_session.cancel_event.set()
+        try:
+            await active_session.agent.cancel()
+        except Exception:
+            pass
+        _active_delegations.pop(active_key, None)
+
+        # 找到排队的消息，重新启动 _handle_chat_task
+        queued_msg = None
+        for q in active_session.queued_messages:
+            if q.get("task_id") == payload.task_id:
+                queued_msg = q
+                break
+        if queued_msg:
+            active_session.queued_messages.remove(queued_msg)
+            # 重新处理排队的消息
+            asyncio.create_task(
+                _handle_chat_task(
+                    queued_msg["task_id"],
+                    ChatRequest(**queued_msg["payload"]),
+                    [TargetHost(**t) for t in queued_msg["targets"]],
+                    queued_msg["host_context"],
+                    queued_msg["conversation_id"],
+                )
+            )
+        return {"task_id": payload.task_id, "status": "cancelled", "action": "cancel_and_new", "reprocessing": True}
+    elif payload.action == "queue":
+        return {"task_id": payload.task_id, "status": "queued", "action": "queue"}
+    else:
+        raise HTTPException(status_code=400, detail=f"无效的 action: {payload.action}")
+
+
+@router.get("/delegate/status/{task_id}")
+async def api_delegate_status(task_id: str) -> dict[str, Any]:
+    """查询委托任务状态"""
+    from app.delegate.executor import _active_delegations
+
+    for key, session in _active_delegations.items():
+        if session.task_id == task_id:
+            return {
+                "task_id": task_id,
+                "active": True,
+                "agent": session.agent.display_name,
+            }
+    return {"task_id": task_id, "active": False}
+
+
+class DelegatePermissionRequest(BaseModel):
+    task_id: str
+    permission_id: str
+    approved: bool
+
+
+@router.post("/delegate/respond-permission")
+async def api_delegate_respond_permission(payload: DelegatePermissionRequest) -> dict[str, Any]:
+    """用户响应 Claude Code 的权限请求（当前版本自动同意，此 API 保留兼容）"""
+    return {
+        "task_id": payload.task_id,
+        "permission_id": payload.permission_id,
+        "approved": payload.approved,
+        "status": "ok",
+        "note": "权限已由系统自动处理",
+    }

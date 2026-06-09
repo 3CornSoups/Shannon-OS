@@ -37,6 +37,26 @@ const router = createRouter({
       path: '/settings',
       name: 'Settings',
       component: () => import('../pages/Settings.vue')
+    },
+    {
+      path: '/monitor-overview',
+      name: 'MonitorOverview',
+      component: () => import('../pages/MonitorDashboard.vue')
+    },
+    {
+      path: '/alerts',
+      name: 'Alerts',
+      component: () => import('../pages/Alerts.vue')
+    },
+    {
+      path: '/alerts/rules',
+      name: 'AlertRules',
+      component: () => import('../pages/AlertRules.vue')
+    },
+    {
+      path: '/tools',
+      name: 'Tools',
+      component: () => import('../pages/Tools.vue')
     }
   ]
 })

@@ -52,6 +52,24 @@
             <line x1="12" y1="8" x2="12.01" y2="8"/>
           </svg>
         </router-link>
+        <router-link to="/monitor-overview" class="activity-item" :class="{ active: $route.path === '/monitor-overview' }" title="监控仪表盘">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="9" y1="21" x2="9" y2="9"/>
+          </svg>
+        </router-link>
+        <router-link to="/alerts" class="activity-item" :class="{ active: $route.path.startsWith('/alerts') }" title="告警中心">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </router-link>
+        <router-link to="/tools" class="activity-item" :class="{ active: $route.path === '/tools' }" title="工具面板">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </router-link>
       </nav>
       <div class="activity-bottom">
         <router-link to="/settings" class="activity-item" :class="{ active: $route.path === '/settings' }" title="设置">
@@ -102,6 +120,7 @@
         </div>
         <div class="top-bar-right">
           <div class="top-bar-actions">
+            <NotificationBell />
             <button class="action-btn" title="命令面板" @click="showCommandPalette = true">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="4,17 10,11 4,5"/>
@@ -177,7 +196,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import TerminalPanel from '../Terminal.vue'
 import FileExplorer from '../FileExplorer.vue'
-
+import NotificationBell from '../NotificationBell.vue'
 const router = useRouter()
 const route = useRoute()
 
@@ -192,7 +211,8 @@ const sectionTitles = {
   '/history': '操作历史',
   '/templates': '执行模板',
   '/showcase': '系统展示',
-  '/settings': '设置'
+  '/settings': '设置',
+  '/tools': '工具面板'
 }
 
 const sectionDescriptions = {
@@ -202,7 +222,8 @@ const sectionDescriptions = {
   '/history': '查看历史操作记录',
   '/templates': '使用预置模板执行命令',
   '/showcase': '了解系统架构、提示词工程与特色能力',
-  '/settings': '管理应用设置'
+  '/settings': '管理应用设置',
+  '/tools': '远程服务器的智能工具 — Claude Code 等'
 }
 
 const currentSectionTitle = computed(() => sectionTitles[route.path] || 'Shannon')

@@ -40,7 +40,7 @@ async def request_text(
         response.raise_for_status()
         data = response.json()
         result = data["choices"][0]["message"]["content"]
-        save_llm_log(system_prompt, user_prompt, model, api_base, payload, data, api_key=api_key)
+        save_llm_log(system_prompt, user_prompt, model, api_base, payload, data, api_key)
         return result
 
 
@@ -62,10 +62,9 @@ async def request_text_from_messages(
         data = response.json()
         result = data["choices"][0]["message"]["content"]
         save_llm_log(
-            system_prompt=messages[0]["content"] if messages and messages[0]["role"] == "system" else "",
-            user_prompt=messages[-1]["content"] if messages else "",
-            model=model, api_base=api_base, request_data=payload, response_data=data,
-            api_key=api_key,
+            messages[0]["content"] if messages and messages[0]["role"] == "system" else "",
+            messages[-1]["content"] if messages else "",
+            model, api_base, payload, data, api_key,
         )
         return result
 
@@ -136,8 +135,9 @@ REACT_TOOLS = [
                     "command": {"type": "string", "description": "要执行的 shell 命令"},
                     "purpose": {"type": "string", "description": "这条命令的目的"},
                     "reasoning": {"type": "string", "description": "为什么执行这条命令"},
+                    "risk_level": {"type": "string", "enum": ["LOW", "HIGH"], "description": "⚠️ 必须正确标注！LOW = 只读查询（cat/ls/df/ps/find/grep/id/which/echo）。HIGH = 任何会改变系统状态的操作，包括但不限于：创建/删除用户(useradd/userdel)、修改用户组(usermod)、安装软件(apt/yum/pip/npm install)、启停服务(systemctl)、修改文件(sed -i/>)、删除文件(rm)、改权限(chmod/chown)、创建目录(mkdir)、移动文件(mv/cp到系统路径)"},
                 },
-                "required": ["command", "purpose", "reasoning"],
+                "required": ["command", "purpose", "reasoning", "risk_level"],
             },
         },
     },
@@ -159,14 +159,53 @@ REACT_TOOLS = [
         "type": "function",
         "function": {
             "name": "ask_user",
-            "description": "需要用户输入或确认时调用",
+            "description": "需要用户帮助时使用——当遇到不可恢复的错误、需要用户提供参数或确认时调用",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "message": {"type": "string", "description": "向用户提出的问题或需要确认的内容"},
+                    "message": {"type": "string", "description": "向用户说明需要什么帮助"},
                     "reasoning": {"type": "string", "description": "为什么需要用户介入"},
                 },
                 "required": ["message", "reasoning"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delegate_task",
+            "description": "将代码相关任务委托给 Claude Code 执行。涉及代码理解的任务优先使用此工具，不要用 find/grep/wc 等 shell 命令拼凑分析。适合委托：代码分析与审计（结构分析、重复代码检测、耦合度分析、质量评估）、代码重构、模块拆分、架构调整、多文件编辑、代码审查、依赖分析、构建脚本/Docker/CI 配置编写与优化、代码级 bug 修复。不适合委托：单条 shell 运维操作、系统状态查询（df/free/uptime）、软件包安装、服务启停。即使任务要求「只分析不修改」，也必须委托给 Claude Code。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target_agent": {
+                        "type": "string",
+                        "description": "目标智能体名称，当前支持 claude_code",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "为什么建议委托给子智能体",
+                    },
+                    "risk_level": {
+                        "type": "string",
+                        "enum": ["LOW", "HIGH"],
+                        "description": "任务风险等级，高风险操作（如系统文件修改、删除等）标记为 HIGH",
+                    },
+                    "context_for_delegate": {
+                        "type": "string",
+                        "description": "传递给子智能体的具体任务描述，包含目标路径、操作范围等",
+                    },
+                    "work_dir": {
+                        "type": "string",
+                        "description": "建议的工作目录，从用户输入中提取路径线索",
+                    },
+                },
+                "required": [
+                    "target_agent",
+                    "reason",
+                    "risk_level",
+                    "context_for_delegate",
+                ],
             },
         },
     },

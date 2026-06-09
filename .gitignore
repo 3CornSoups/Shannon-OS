@@ -1,27 +1,65 @@
-# Sensitive data - API keys and host info are stored here
-data/
-logs/
-
 # Python
 __pycache__/
 *.py[cod]
-.venv/
+*$py.class
+*.so
+.Python
 *.egg-info/
 dist/
 build/
+.eggs/
 *.egg
 
-# Node
-node_modules/
-web/node_modules/
-web/dist/
-
-# Environment
-.env
+# 虚拟环境
+.venv/
+venv/
+env/
+ENV/
 
 # IDE
 .vscode/
+.trae/
+.claude/
 .idea/
+*.swp
+*.swo
+
+# 环境变量（敏感信息）
+.env
+
+# 数据库（运行时数据）
+*.db
+data/shannon.db
+
+# 日志
+logs/
+*.log
+
+# Node.js
+node_modules/
+web/node_modules/
+desktop/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 前端构建产物
+web/dist/
+
+# Electron 构建产物
+desktop/dist-electron/
+desktop/release/
+
+# 打包产物
+*.zip
+*.tar.gz
+*.rar
+
+# 文档（开发过程文件）
+PRD_*.md
+
+# 构建脚本（仅保留 build.py）
+scripts/
 
 # OS
 .DS_Store

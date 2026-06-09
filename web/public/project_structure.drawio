@@ -1,0 +1,1155 @@
+<mxfile host="app.diagrams.net" agent="Shannon OS" pages="4">
+  <diagram id="arch-overview" name="架构总览">
+    <mxGraphModel dx="1078" dy="479" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=28;fontStyle=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#1a1a2e;" value="Shannon OS — 项目架构总览" vertex="1">
+          <mxGeometry height="50" width="600" x="400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-box" parent="1" style="rounded=0;whiteSpace=wrap;fillColor=#f8f9fa;strokeColor=#dee2e6;" value="" vertex="1">
+          <mxGeometry height="220" width="280" x="-30" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-title" parent="1" style="text;html=1;fontSize=14;fontStyle=1;align=left;fillColor=none;strokeColor=none;fontColor=#1a1a2e;" value="图例" vertex="1">
+          <mxGeometry height="25" width="60" x="30" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-rect" parent="1" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="" vertex="1">
+          <mxGeometry height="20" width="30" x="30" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-rect-text" parent="1" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;" value="普通模块" vertex="1">
+          <mxGeometry height="20" width="80" x="70" y="55" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-round" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=40;" value="" vertex="1">
+          <mxGeometry height="20" width="30" x="30" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-round-text" parent="1" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;" value="接口 / 路由层" vertex="1">
+          <mxGeometry height="20" width="100" x="70" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-diamond" parent="1" style="rhombus;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;" value="" vertex="1">
+          <mxGeometry height="25" width="30" x="30" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-diamond-text" parent="1" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;" value="数据处理单元" vertex="1">
+          <mxGeometry height="20" width="100" x="70" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-cylinder" parent="1" style="shape=cylinder3;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;size=8;" value="" vertex="1">
+          <mxGeometry height="28" width="30" x="30" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-cylinder-text" parent="1" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;" value="数据存储" vertex="1">
+          <mxGeometry height="20" width="80" x="70" y="155" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-arrow-call" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="30" y="200" as="sourcePoint" />
+            <mxPoint x="60" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend-arrow-call-text" parent="1" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;" value="调用 / 依赖" vertex="1">
+          <mxGeometry height="20" width="80" x="70" y="192" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-arrow-data" edge="1" parent="1" style="endArrow=open;endFill=0;strokeColor=#e07b39;strokeWidth=2;dashed=1;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="150" y="200" as="sourcePoint" />
+            <mxPoint x="180" y="200" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="legend-arrow-data-text" parent="1" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;" value="数据流" vertex="1">
+          <mxGeometry height="20" width="60" x="190" y="192" as="geometry" />
+        </mxCell>
+        <mxCell id="user" parent="1" style="shape=actor;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;fontStyle=1;" value="👤 用户" vertex="1">
+          <mxGeometry height="60" width="40" x="620" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend-group" parent="1" style="swimlane;startSize=28;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;fontStyle=1;rounded=1;arcSize=8;" value="前端层 (Vue 3 + Pinia + Vite)" vertex="1">
+          <mxGeometry height="240" width="660" x="310" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="vue-app" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="App.vue&#xa;(根组件)" vertex="1">
+          <mxGeometry height="45" width="90" x="20" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vue-router" parent="frontend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;arcSize=40;" value="Router&#xa;(路由)" vertex="1">
+          <mxGeometry height="45" width="80" x="130" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vue-pinia" parent="frontend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;arcSize=40;" value="Pinia&#xa;(状态管理)" vertex="1">
+          <mxGeometry height="45" width="80" x="230" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vue-api" parent="frontend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;arcSize=40;" value="API Service&#xa;(axios)" vertex="1">
+          <mxGeometry height="45" width="90" x="330" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="vue-composable" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Composables&#xa;(useCharts&#xa;useVoiceInput)" vertex="1">
+          <mxGeometry height="55" width="100" x="440" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="page-dashboard" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="Dashboard" vertex="1">
+          <mxGeometry height="35" width="80" x="10" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="page-servers" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="Servers" vertex="1">
+          <mxGeometry height="35" width="70" x="100" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="page-monitoring" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="Monitoring" vertex="1">
+          <mxGeometry height="35" width="80" x="180" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="page-templates" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="Templates" vertex="1">
+          <mxGeometry height="35" width="80" x="270" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="page-history" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="History" vertex="1">
+          <mxGeometry height="35" width="70" x="360" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="page-settings" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="Settings" vertex="1">
+          <mxGeometry height="35" width="70" x="440" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="page-showcase" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=10;" value="Showcase" vertex="1">
+          <mxGeometry height="35" width="70" x="520" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="comp-layout" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Layout.vue" vertex="1">
+          <mxGeometry height="35" width="80" x="10" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="comp-terminal" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="Terminal.vue" vertex="1">
+          <mxGeometry height="35" width="80" x="100" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="comp-fileexplorer" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="FileExplorer.vue" vertex="1">
+          <mxGeometry height="35" width="100" x="190" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="store-server" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="server&#xa;Store" vertex="1">
+          <mxGeometry height="35" width="60" x="320" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="store-settings" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="settings&#xa;Store" vertex="1">
+          <mxGeometry height="35" width="60" x="390" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="store-history" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="history&#xa;Store" vertex="1">
+          <mxGeometry height="35" width="60" x="460" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="store-template" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="template&#xa;Store" vertex="1">
+          <mxGeometry height="35" width="60" x="530" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="store-terminal" parent="frontend-group" style="rounded=0;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="terminal&#xa;Store" vertex="1">
+          <mxGeometry height="35" width="50" x="600" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="comm-label" parent="1" style="text;html=1;fontSize=11;fontStyle=1;align=center;fillColor=none;strokeColor=none;fontColor=#e07b39;" value="HTTP REST / SSE (Server-Sent Events)" vertex="1">
+          <mxGeometry height="25" width="280" x="470" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="comm-line" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;dashed=1;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="410" as="sourcePoint" />
+            <mxPoint x="560" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="backend-group" parent="1" style="swimlane;startSize=28;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;fontStyle=1;rounded=1;arcSize=8;" value="后端层 (Python / FastAPI / Uvicorn)" vertex="1">
+          <mxGeometry height="510" width="1080" x="100" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="main-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" value="main.py&#xa;(FastAPI App)&#xa;启动/关闭/CORS/SPA" vertex="1">
+          <mxGeometry height="55" width="140" x="440" y="35" as="geometry" />
+        </mxCell>
+        <mxCell id="router-chat" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="chat.py&#xa;聊天/Agent/&#xa;SSE/确认/会话" vertex="1">
+          <mxGeometry height="55" width="110" x="20" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="router-hosts" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="hosts.py&#xa;服务器CRUD&#xa;连接测试" vertex="1">
+          <mxGeometry height="55" width="110" x="145" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="router-terminal" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="terminal.py&#xa;终端命令&#xa;执行" vertex="1">
+          <mxGeometry height="55" width="100" x="270" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="router-files" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="files.py&#xa;文件浏览&#xa;读写/创建/删除" vertex="1">
+          <mxGeometry height="55" width="110" x="385" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="router-monitoring" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="monitoring.py&#xa;系统监控&#xa;数据采集" vertex="1">
+          <mxGeometry height="55" width="110" x="510" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="router-history" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="history.py&#xa;操作历史&#xa;环境快照" vertex="1">
+          <mxGeometry height="55" width="100" x="635" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="router-settings" parent="backend-group" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=30;" value="settings.py&#xa;配置管理&#xa;API测试/模板" vertex="1">
+          <mxGeometry height="55" width="110" x="750" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="agent-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" value="agent.py&#xa;ShannonAgent&#xa;意图分析/计划生成&#xa;风险验证/自我修复&#xa;ReAct循环编排" vertex="1">
+          <mxGeometry height="80" width="140" x="20" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="llm-client" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="llm_client.py&#xa;LLM API调用层&#xa;非流式/流式/Tool Call&#xa;JSON提取/Think提取" vertex="1">
+          <mxGeometry height="70" width="140" x="20" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="conversation" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="conversation.py&#xa;ConversationManager&#xa;消息列表/自动截断&#xa;智能折叠/工具结果" vertex="1">
+          <mxGeometry height="70" width="140" x="180" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="prompts" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="prompts.py&#xa;系统提示词&#xa;CHAT_RULES&#xa;AGENT_RULES&#xa;STAGE_HINTS" vertex="1">
+          <mxGeometry height="80" width="130" x="180" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="models" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="models.py&#xa;Pydantic模型&#xa;AgentOutput&#xa;ReActCommand/Done/Ask&#xa;AgentConfig" vertex="1">
+          <mxGeometry height="80" width="130" x="340" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="executor" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" value="executor.py&#xa;命令执行引擎&#xa;LocalExecutor&#xa;SSHExecutor&#xa;ExecutorRouter" vertex="1">
+          <mxGeometry height="80" width="130" x="340" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="connection" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" value="connection.py&#xa;SSH连接池&#xa;asyncssh+paramiko&#xa;自动切换/健康检查&#xa;空闲清理" vertex="1">
+          <mxGeometry height="80" width="130" x="500" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="terminal-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="terminal.py&#xa;终端命令执行&#xa;凭证自动加载" vertex="1">
+          <mxGeometry height="55" width="120" x="500" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="files-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="files.py&#xa;远程文件操作&#xa;列表/读取/写入&#xa;创建/删除/重命名" vertex="1">
+          <mxGeometry height="70" width="120" x="640" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="monitor-py" parent="backend-group" style="rhombus;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" value="monitor.py&#xa;SystemMonitor&#xa;CPU/内存/磁盘&#xa;网络/进程采集&#xa;数据解析" vertex="1">
+          <mxGeometry height="100" width="140" x="640" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="events" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="events.py&#xa;EventStore&#xa;SSE事件缓存&#xa;订阅/发布/重放" vertex="1">
+          <mxGeometry height="60" width="120" x="800" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="errors" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="errors.py&#xa;自定义异常&#xa;retry_async" vertex="1">
+          <mxGeometry height="50" width="110" x="800" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="security" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="security.py&#xa;PasswordManager&#xa;密码加密/解密" vertex="1">
+          <mxGeometry height="50" width="120" x="800" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="settings-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="settings.py&#xa;配置管理&#xa;env&gt;yaml&gt;DB&gt;默认" vertex="1">
+          <mxGeometry height="50" width="120" x="940" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="logger-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" value="logger.py&#xa;LLM调用日志&#xa;API Key脱敏" vertex="1">
+          <mxGeometry height="50" width="120" x="940" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="database-py" parent="backend-group" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;" value="database.py&#xa;SQLite数据层&#xa;主机/会话/操作日志&#xa;审计/快照/设置" vertex="1">
+          <mxGeometry height="70" width="120" x="940" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="e-main-chat" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="470" y="90" as="sourcePoint" />
+            <mxPoint x="75" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-main-hosts" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="480" y="90" as="sourcePoint" />
+            <mxPoint x="200" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-main-terminal" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="500" y="90" as="sourcePoint" />
+            <mxPoint x="320" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-main-files" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="90" as="sourcePoint" />
+            <mxPoint x="440" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-main-monitoring" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="540" y="90" as="sourcePoint" />
+            <mxPoint x="565" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-main-history" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="90" as="sourcePoint" />
+            <mxPoint x="685" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-main-settings" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="90" as="sourcePoint" />
+            <mxPoint x="805" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-chat-agent" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="75" y="175" as="sourcePoint" />
+            <mxPoint x="90" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-chat-events" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="130" y="175" as="sourcePoint" />
+            <mxPoint x="810" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-chat-exec" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="175" as="sourcePoint" />
+            <mxPoint x="370" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-chat-db" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="120" y="175" as="sourcePoint" />
+            <mxPoint x="960" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-hosts-exec" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="175" as="sourcePoint" />
+            <mxPoint x="380" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-hosts-db" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="220" y="175" as="sourcePoint" />
+            <mxPoint x="960" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-hosts-conn" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="175" as="sourcePoint" />
+            <mxPoint x="530" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-terminal-py" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="175" as="sourcePoint" />
+            <mxPoint x="540" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-files-py" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="440" y="175" as="sourcePoint" />
+            <mxPoint x="680" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-monitoring-py" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="565" y="175" as="sourcePoint" />
+            <mxPoint x="690" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-history-db" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="685" y="175" as="sourcePoint" />
+            <mxPoint x="960" y="370" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-settings-db" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="810" y="175" as="sourcePoint" />
+            <mxPoint x="980" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-settings-py" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#82b366;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="830" y="175" as="sourcePoint" />
+            <mxPoint x="970" y="210" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-agent-llm" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="90" y="290" as="sourcePoint" />
+            <mxPoint x="90" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-agent-conv" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="160" y="250" as="sourcePoint" />
+            <mxPoint x="180" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-agent-prompts" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="280" as="sourcePoint" />
+            <mxPoint x="200" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-agent-models" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="160" y="240" as="sourcePoint" />
+            <mxPoint x="340" y="240" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-agent-errors" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="160" y="270" as="sourcePoint" />
+            <mxPoint x="800" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-exec-conn" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="470" y="350" as="sourcePoint" />
+            <mxPoint x="500" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-terminal-exec" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="540" y="265" as="sourcePoint" />
+            <mxPoint x="420" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-files-exec" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="280" as="sourcePoint" />
+            <mxPoint x="440" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-monitor-conn" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="360" as="sourcePoint" />
+            <mxPoint x="630" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-llm-logger" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="160" y="350" as="sourcePoint" />
+            <mxPoint x="940" y="300" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-db-security" edge="1" parent="backend-group" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="960" y="380" as="sourcePoint" />
+            <mxPoint x="920" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="db-shannon" parent="1" style="shape=cylinder3;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;size=10;" value="shannon.db&#xa;(SQLite)" vertex="1">
+          <mxGeometry height="60" width="100" x="1250" y="630" as="geometry" />
+        </mxCell>
+        <mxCell id="db-tables" parent="1" style="text;html=1;fontSize=9;align=center;fillColor=none;strokeColor=none;fontColor=#666666;" value="hosts | conversations | chat_messages&#xa;operation_logs | audit_records&#xa;env_snapshots | user_actions | app_settings" vertex="1">
+          <mxGeometry height="50" width="200" x="1270" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="logs-dir" parent="1" style="shape=cylinder3;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;size=8;" value="logs/&#xa;(LLM调用日志)" vertex="1">
+          <mxGeometry height="50" width="100" x="1240" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="llm-api" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;arcSize=30;" value="🤖 LLM API&#xa;(DeepSeek / OpenAI兼容)" vertex="1">
+          <mxGeometry height="50" width="200" x="20" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="target-servers" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;arcSize=30;" value="🖥️ 目标服务器&#xa;(Linux SSH)" vertex="1">
+          <mxGeometry height="50" width="180" x="500" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="e-user-fe" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="140" as="sourcePoint" />
+            <mxPoint x="640" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-fe-be" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="410" as="sourcePoint" />
+            <mxPoint x="560" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-llm-api" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="760" as="sourcePoint" />
+            <mxPoint x="120" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-db-sqlite" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1239.41" y="920" as="sourcePoint" />
+            <mxPoint x="1239.41" y="800" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-logger-logs" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1250" y="750" as="sourcePoint" />
+            <mxPoint x="1250" y="830" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-conn-target" edge="1" parent="1" style="endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=2;dashed=1;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="600" y="960" as="sourcePoint" />
+            <mxPoint x="590" y="1010" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="flow-chat" parent="1" style="text;html=1;fontSize=10;align=left;fillColor=#f0f7ff;strokeColor=#6c8ebf;rounded=1;spacingLeft=5;spacingTop=3;fontColor=#333333;" value="① 用户发送消息&#xa;→ Agent分析意图&#xa;→ LLM生成计划&#xa;→ 用户确认&#xa;→ ReAct循环执行&#xa;→ SSE实时推送" vertex="1">
+          <mxGeometry height="110" width="160" x="-70" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-monitor" parent="1" style="text;html=1;fontSize=10;align=left;fillColor=#fff8e1;strokeColor=#d6b656;rounded=1;spacingLeft=5;spacingTop=3;fontColor=#333333;" value="② 监控数据流&#xa;→ SSH采集原始数据&#xa;→ 解析CPU/内存/磁盘&#xa;→ 前端ECharts渲染" vertex="1">
+          <mxGeometry height="80" width="160" x="-70" y="665" as="geometry" />
+        </mxCell>
+        <mxCell id="flow-file" parent="1" style="text;html=1;fontSize=10;align=left;fillColor=#f0fff0;strokeColor=#82b366;rounded=1;spacingLeft=5;spacingTop=3;fontColor=#333333;" value="③ 文件操作流&#xa;→ SSH执行shell命令&#xa;→ 解析stat/ls输出&#xa;→ 前端文件树渲染" vertex="1">
+          <mxGeometry height="80" width="160" x="-70" y="760" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="module-detail" name="模块依赖关系">
+    <mxGraphModel dx="2200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title2" value="Shannon OS — 模块依赖关系详图" style="text;html=1;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+        <!-- ===== 入口 ===== -->
+        <mxCell id="d-run" value="run.py&#xa;启动入口&#xa;venv/依赖检查/浏览器" style="rounded=0;whiteSpace=wrap;fillColor=#e6f3ff;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="80" width="160" height="55" as="geometry" />
+        </mxCell>
+        <!-- ===== FastAPI App ===== -->
+        <mxCell id="d-main" value="app/main.py&#xa;FastAPI应用&#xa;路由注册 / CORS / SPA / 生命周期" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="470" y="170" width="220" height="55" as="geometry" />
+        </mxCell>
+        <!-- ===== 路由层 ===== -->
+        <mxCell id="d-r-chat" value="routers/chat.py&#xa;POST /api/chat&#xa;POST /api/execute/confirm&#xa;GET /api/stream/{task_id}&#xa;会话CRUD" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="20" y="280" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d-r-hosts" value="routers/hosts.py&#xa;GET/POST/PUT/DELETE /api/hosts&#xa;POST /api/host/test&#xa;GET /api/context/{id}" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="200" y="280" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="d-r-terminal" value="routers/terminal.py&#xa;POST /api/terminal/exec" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="380" y="280" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="d-r-files" value="routers/files.py&#xa;POST /api/files/{list,read,write,create,delete,rename}" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="550" y="280" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="d-r-monitoring" value="routers/monitoring.py&#xa;POST /api/monitor/{host_id}" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="750" y="280" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="d-r-history" value="routers/history.py&#xa;GET /api/history/actions/{id}&#xa;GET /api/history/env-snapshots/{id}" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="930" y="280" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d-r-settings" value="routers/settings.py&#xa;GET/POST /api/settings&#xa;POST /api/settings/test&#xa;POST /api/templates/generate" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;arcSize=25;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="280" width="170" height="70" as="geometry" />
+        </mxCell>
+        <!-- ===== 核心业务模块 ===== -->
+        <mxCell id="d-agent" value="agent.py — ShannonAgent&#xa;━━━━━━━━━━━━━━━━━&#xa;stage1_intent_analyze()&#xa;stage2_plan_generate()&#xa;stage3_plan_validate()&#xa;stage5_self_heal()&#xa;stream_reply()&#xa;_request_first_action()&#xa;_request_react_action()&#xa;assess_risk()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="20" y="420" width="210" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="d-llm" value="llm_client.py — LLM调用层&#xa;━━━━━━━━━━━━━━━━━&#xa;request_text()&#xa;request_text_from_messages()&#xa;stream_reply()&#xa;try_tool_call()&#xa;extract_json()&#xa;extract_think()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="20" y="590" width="210" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="d-conv" value="conversation.py&#xa;━━━━━━━━━━━━━━━━━&#xa;ConversationManager&#xa;  set_system_prompt()&#xa;  add_user_message()&#xa;  add_assistant_message()&#xa;  add_tool_result()&#xa;  _trim() 智能折叠" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="260" y="420" width="190" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="d-prompts" value="prompts.py&#xa;━━━━━━━━━━━━━━━━━&#xa;CHAT_RULES&#xa;AGENT_RULES&#xa;STAGE_HINTS&#xa;build_system_prompt()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="260" y="570" width="190" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="d-models" value="models.py&#xa;━━━━━━━━━━━━━━━━━&#xa;CommandItem&#xa;AgentOutput&#xa;ReActCommand&#xa;ReActDone&#xa;ReActAsk&#xa;AgentConfig" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="480" y="420" width="160" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="d-executor" value="executor.py — 执行引擎&#xa;━━━━━━━━━━━━━━━━━&#xa;TargetHost / ExecContext&#xa;ExecResult&#xa;BaseExecutor&#xa;  ├ LocalExecutor&#xa;  └ SSHExecutor&#xa;ExecutorRouter" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="480" y="570" width="170" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="d-connection" value="connection.py — SSH连接池&#xa;━━━━━━━━━━━━━━━━━&#xa;SSHConnectionPool (全局单例)&#xa;  get_connection()&#xa;  release_connection()&#xa;  get_paramiko_client()&#xa;  _cleanup_loop()&#xa;  asyncssh → paramiko自动切换" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="680" y="570" width="200" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="d-terminal" value="terminal.py&#xa;━━━━━━━━━━━━━━━━━&#xa;TerminalCommandRequest&#xa;exec_terminal_command()&#xa;→ SSHExecutor.run()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="680" y="420" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d-files" value="files.py — 远程文件操作&#xa;━━━━━━━━━━━━━━━━━&#xa;list_directory()&#xa;read_file()&#xa;write_file()&#xa;create_file_entry()&#xa;delete_entry()&#xa;rename_entry()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="420" width="170" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="d-monitor" value="monitor.py — 系统监控&#xa;━━━━━━━━━━━━━━━━━&#xa;SystemMonitor&#xa;  collect_raw()&#xa;  _parse_cpu/memory/disk&#xa;  _parse_network/processes&#xa;  get_system_info()" style="rhombus;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="880" y="570" width="190" height="140" as="geometry" />
+        </mxCell>
+        <!-- ===== 基础设施模块 ===== -->
+        <mxCell id="d-database" value="database.py — SQLite数据层&#xa;━━━━━━━━━━━━━━━━━&#xa;init_db() / get_connection()&#xa;upsert_host_context()&#xa;get_host_context()&#xa;list_hosts() / update_host()&#xa;create/list/delete_conversation()&#xa;append_operation_log()&#xa;append_audit_record()&#xa;append_env_snapshot()&#xa;append_chat_message()&#xa;set/get_app_setting()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="420" width="190" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="d-security" value="security.py&#xa;━━━━━━━━━━━━━━━━━&#xa;PasswordManager&#xa;  encrypt()&#xa;  decrypt()&#xa;  is_encrypted()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="620" width="150" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="d-settings" value="settings.py&#xa;━━━━━━━━━━━━━━━━━&#xa;get_default_settings()&#xa;load_runtime_settings()&#xa;env &gt; yaml &gt; DB &gt; 默认" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="750" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d-events" value="events.py&#xa;━━━━━━━━━━━━━━━━━&#xa;EventStore (全局单例)&#xa;  subscribe()&#xa;  emit()&#xa;  unsubscribe()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="470" y="740" width="150" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="d-errors" value="errors.py&#xa;━━━━━━━━━━━━━━━━━&#xa;SSHConnectionError&#xa;SSHAuthenticationError&#xa;SSHCommandError&#xa;LLMAPIError&#xa;retry_async()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="650" y="740" width="150" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="d-logger" value="logger.py&#xa;━━━━━━━━━━━━━━━━━&#xa;save_llm_log()&#xa;save_stream_log()&#xa;_mask_api_key()" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;fontStyle=1;align=left;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="830" y="740" width="140" height="90" as="geometry" />
+        </mxCell>
+        <!-- ===== 依赖箭头 ===== -->
+        <!-- run → main -->
+        <mxCell id="de-run-main" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="135" as="sourcePoint" />
+            <mxPoint x="580" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- main → routers -->
+        <mxCell id="de-main-r1" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="500" y="225" as="sourcePoint" />
+            <mxPoint x="100" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-main-r2" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="520" y="225" as="sourcePoint" />
+            <mxPoint x="280" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-main-r3" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="225" as="sourcePoint" />
+            <mxPoint x="455" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-main-r4" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="225" as="sourcePoint" />
+            <mxPoint x="640" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-main-r5" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="610" y="225" as="sourcePoint" />
+            <mxPoint x="830" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-main-r6" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="225" as="sourcePoint" />
+            <mxPoint x="1020" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-main-r7" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="660" y="225" as="sourcePoint" />
+            <mxPoint x="1215" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- chat → agent, events, executor, database -->
+        <mxCell id="de-chat-agent" style="endArrow=block;endFill=1;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="100" y="370" as="sourcePoint" />
+            <mxPoint x="100" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-chat-events" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="150" y="370" as="sourcePoint" />
+            <mxPoint x="500" y="740" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-chat-exec" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="130" y="370" as="sourcePoint" />
+            <mxPoint x="530" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-chat-db" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="170" y="370" as="sourcePoint" />
+            <mxPoint x="1120" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- hosts → database, executor, connection -->
+        <mxCell id="de-hosts-db" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="360" as="sourcePoint" />
+            <mxPoint x="1130" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-hosts-exec" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="360" as="sourcePoint" />
+            <mxPoint x="540" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-hosts-conn" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="320" y="360" as="sourcePoint" />
+            <mxPoint x="730" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- terminal → terminal-py -->
+        <mxCell id="de-term-py" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="455" y="330" as="sourcePoint" />
+            <mxPoint x="720" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- files → files-py -->
+        <mxCell id="de-files-py" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="660" y="335" as="sourcePoint" />
+            <mxPoint x="920" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- monitoring → monitor-py -->
+        <mxCell id="de-mon-py" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="850" y="330" as="sourcePoint" />
+            <mxPoint x="930" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- history → database -->
+        <mxCell id="de-hist-db" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1060" y="340" as="sourcePoint" />
+            <mxPoint x="1140" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- settings → database, settings-py -->
+        <mxCell id="de-sett-db" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1240" y="350" as="sourcePoint" />
+            <mxPoint x="1200" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="de-sett-sett" style="endArrow=block;endFill=1;strokeColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1220" y="350" as="sourcePoint" />
+            <mxPoint x="1170" y="750" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- agent → llm_client -->
+        <mxCell id="de-agent-llm" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="125" y="560" as="sourcePoint" />
+            <mxPoint x="125" y="590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- agent → conversation -->
+        <mxCell id="de-agent-conv" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="490" as="sourcePoint" />
+            <mxPoint x="260" y="490" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- agent → prompts -->
+        <mxCell id="de-agent-prompts" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="560" as="sourcePoint" />
+            <mxPoint x="280" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- agent → models -->
+        <mxCell id="de-agent-models" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="460" as="sourcePoint" />
+            <mxPoint x="480" y="460" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- agent → errors -->
+        <mxCell id="de-agent-errors" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="530" as="sourcePoint" />
+            <mxPoint x="650" y="740" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- executor → connection -->
+        <mxCell id="de-exec-conn" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="650" y="640" as="sourcePoint" />
+            <mxPoint x="680" y="640" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- terminal-py → executor -->
+        <mxCell id="de-term-exec" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="510" as="sourcePoint" />
+            <mxPoint x="580" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- files-py → executor -->
+        <mxCell id="de-files-exec" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="920" y="540" as="sourcePoint" />
+            <mxPoint x="600" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- monitor → connection -->
+        <mxCell id="de-mon-conn" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="880" y="650" as="sourcePoint" />
+            <mxPoint x="880" y="650" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- database → security -->
+        <mxCell id="de-db-sec" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1150" y="590" as="sourcePoint" />
+            <mxPoint x="1150" y="620" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- llm_client → errors -->
+        <mxCell id="de-llm-errors" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="660" as="sourcePoint" />
+            <mxPoint x="650" y="760" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- llm_client → logger -->
+        <mxCell id="de-llm-logger" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="680" as="sourcePoint" />
+            <mxPoint x="830" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- settings → database -->
+        <mxCell id="de-sett-py-db" style="endArrow=block;endFill=1;strokeColor=#1a1a2e;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1200" y="750" as="sourcePoint" />
+            <mxPoint x="1230" y="590" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- ===== 外部依赖 ===== -->
+        <mxCell id="ext-group" value="外部依赖" style="swimlane;startSize=22;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;fontStyle=1;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="20" y="760" width="420" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-fastapi" value="FastAPI" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="10" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-uvicorn" value="Uvicorn" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="80" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-httpx" value="httpx" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="150" y="30" width="50" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-aiosqlite" value="aiosqlite" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="210" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-pydantic" value="Pydantic" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="280" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-asyncssh" value="asyncssh" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="10" y="65" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-paramiko" value="paramiko" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="80" y="65" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-dotenv" value="python-dotenv" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="150" y="65" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ext-yaml" value="PyYAML" style="rounded=0;whiteSpace=wrap;fillColor=#f0f0f0;strokeColor=#999;fontSize=10;" vertex="1" parent="ext-group">
+          <mxGeometry x="240" y="65" width="50" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="data-flow" name="数据流向">
+    <mxGraphModel dx="2200" dy="1600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="2400" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title3" value="Shannon OS — 核心数据流向图" style="text;html=1;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+        <!-- ===== 用户 ===== -->
+        <mxCell id="df-user" value="👤 用户" style="shape=actor;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="80" width="40" height="60" as="geometry" />
+        </mxCell>
+        <!-- ===== 前端 ===== -->
+        <mxCell id="df-frontend" value="Vue 前端&#xa;(Dashboard / Servers / Monitoring...)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="460" y="180" width="280" height="50" as="geometry" />
+        </mxCell>
+        <!-- ===== API层 ===== -->
+        <mxCell id="df-api" value="FastAPI 路由层&#xa;(/api/chat, /api/hosts, /api/terminal, ...)" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="420" y="280" width="360" height="50" as="geometry" />
+        </mxCell>
+        <!-- ===== Agent核心 ===== -->
+        <mxCell id="df-agent" value="ShannonAgent&#xa;ReAct循环编排" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="400" width="150" height="50" as="geometry" />
+        </mxCell>
+        <!-- ===== LLM ===== -->
+        <mxCell id="df-llm" value="🤖 LLM API&#xa;(DeepSeek/OpenAI)" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="20" y="400" width="150" height="50" as="geometry" />
+        </mxCell>
+        <!-- ===== Executor ===== -->
+        <mxCell id="df-exec" value="Executor&#xa;命令执行引擎" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="400" width="140" height="50" as="geometry" />
+        </mxCell>
+        <!-- ===== SSH Pool ===== -->
+        <mxCell id="df-ssh" value="SSH 连接池&#xa;(asyncssh/paramiko)" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="510" width="140" height="45" as="geometry" />
+        </mxCell>
+        <!-- ===== Target Server ===== -->
+        <mxCell id="df-target" value="🖥️ 目标Linux服务器" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;arcSize=20;" vertex="1" parent="1">
+          <mxGeometry x="420" y="620" width="160" height="50" as="geometry" />
+        </mxCell>
+        <!-- ===== EventStore ===== -->
+        <mxCell id="df-events" value="EventStore&#xa;SSE事件" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="700" y="400" width="100" height="45" as="geometry" />
+        </mxCell>
+        <!-- ===== Database ===== -->
+        <mxCell id="df-db" value="SQLite&#xa;(shannon.db)" style="shape=cylinder3;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;size=8;" vertex="1" parent="1">
+          <mxGeometry x="870" y="390" width="100" height="55" as="geometry" />
+        </mxCell>
+        <!-- ===== Conversation ===== -->
+        <mxCell id="df-conv" value="Conversation&#xa;Manager" style="rounded=0;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="510" width="110" height="40" as="geometry" />
+        </mxCell>
+        <!-- ===== 数据流箭头 ===== -->
+        <!-- 用户 → 前端 -->
+        <mxCell id="df-e1" value="操作指令" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry x="0.1" relative="1" as="geometry">
+            <mxPoint x="600" y="140" as="sourcePoint" />
+            <mxPoint x="600" y="180" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <!-- 前端 → API -->
+        <mxCell id="df-e2" value="HTTP请求" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="600" y="230" as="sourcePoint" />
+            <mxPoint x="600" y="280" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- API → Agent -->
+        <mxCell id="df-e3" value="用户消息" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="480" y="330" as="sourcePoint" />
+            <mxPoint x="275" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- API → Executor (直接执行) -->
+        <mxCell id="df-e4" value="执行命令" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="600" y="330" as="sourcePoint" />
+            <mxPoint x="490" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- API → Database -->
+        <mxCell id="df-e5" value="CRUD" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="730" y="305" as="sourcePoint" />
+            <mxPoint x="920" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Agent → LLM -->
+        <mxCell id="df-e6" value="① 发送Prompt" style="endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="425" as="sourcePoint" />
+            <mxPoint x="170" y="425" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- LLM → Agent -->
+        <mxCell id="df-e7" value="② 返回JSON/ToolCall" style="endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#9673a6;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="170" y="435" as="sourcePoint" />
+            <mxPoint x="200" y="435" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Agent → Conversation -->
+        <mxCell id="df-e8" value="③ 上下文管理" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="275" y="450" as="sourcePoint" />
+            <mxPoint x="255" y="510" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Agent → Executor -->
+        <mxCell id="df-e9" value="④ 执行命令" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="350" y="425" as="sourcePoint" />
+            <mxPoint x="420" y="425" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Executor → SSH Pool -->
+        <mxCell id="df-e10" value="⑤ SSH连接" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="490" y="450" as="sourcePoint" />
+            <mxPoint x="490" y="510" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- SSH Pool → Target -->
+        <mxCell id="df-e11" value="⑥ 远程执行" style="endArrow=block;endFill=1;strokeColor=#e07b39;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#e07b39;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="490" y="555" as="sourcePoint" />
+            <mxPoint x="490" y="620" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Target → Executor (返回) -->
+        <mxCell id="df-e12" value="⑦ 命令输出" style="endArrow=open;endFill=0;strokeColor=#82b366;strokeWidth=2;dashed=1;fontSize=10;fontStyle=1;fontColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="460" y="620" as="sourcePoint" />
+            <mxPoint x="440" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Executor → Agent (返回结果) -->
+        <mxCell id="df-e13" value="⑧ 执行结果" style="endArrow=open;endFill=0;strokeColor=#82b366;strokeWidth=2;dashed=1;fontSize=10;fontStyle=1;fontColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="420" y="410" as="sourcePoint" />
+            <mxPoint x="350" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Agent → EventStore -->
+        <mxCell id="df-e14" value="⑨ 推送事件" style="endArrow=block;endFill=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#6c8ebf;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="350" y="415" as="sourcePoint" />
+            <mxPoint x="700" y="415" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- EventStore → 前端 (SSE) -->
+        <mxCell id="df-e15" value="⑩ SSE实时推送" style="endArrow=open;endFill=0;strokeColor=#82b366;strokeWidth=2;dashed=1;fontSize=10;fontStyle=1;fontColor=#82b366;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="750" y="400" as="sourcePoint" />
+            <mxPoint x="700" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- Agent → Database -->
+        <mxCell id="df-e16" value="⑪ 记录日志/审计" style="endArrow=block;endFill=1;strokeColor=#b85450;strokeWidth=2;fontSize=10;fontStyle=1;fontColor=#b85450;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="350" y="440" as="sourcePoint" />
+            <mxPoint x="870" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <!-- ===== ReAct循环标注 ===== -->
+        <mxCell id="df-react-box" value="" style="rounded=1;whiteSpace=wrap;fillColor=none;strokeColor=#e07b39;strokeWidth=2;dashed=1;arcSize=10;" vertex="1" parent="1">
+          <mxGeometry x="15" y="380" width="810" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="df-react-label" value="ReAct 循环 (最多20轮)&#xa;思考 → 行动 → 观察 → 再思考..." style="text;html=1;fontSize=12;fontStyle=1;align=center;fillColor=none;strokeColor=none;fontColor=#e07b39;" vertex="1" parent="1">
+          <mxGeometry x="250" y="560" width="300" height="35" as="geometry" />
+        </mxCell>
+        <!-- ===== 完整流程说明 ===== -->
+        <mxCell id="df-flow-desc" value="&lt;b&gt;核心数据流说明&lt;/b&gt;&lt;br&gt;&lt;br&gt;① 用户发送消息 → 前端HTTP请求 → API路由层&lt;br&gt;② API创建ShannonAgent，加载会话历史&lt;br&gt;③ Agent构建System Prompt，调用LLM API&lt;br&gt;④ LLM返回结构化JSON或ToolCall&lt;br&gt;⑤ Agent验证风险等级，高危命令等待用户确认&lt;br&gt;⑥ 确认后进入ReAct循环：执行命令→观察结果→决策下一步&lt;br&gt;⑦ 命令通过SSH连接池发送到目标服务器&lt;br&gt;⑧ 执行结果反馈给LLM，决定继续或完成&lt;br&gt;⑨ 每步事件通过EventStore + SSE实时推送到前端&lt;br&gt;⑩ 所有操作记录到SQLite（日志/审计/快照）" style="text;html=1;fontSize=11;align=left;fillColor=#f8f9fa;strokeColor=#dee2e6;rounded=1;spacingLeft=10;spacingTop=8;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="870" y="500" width="310" height="220" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="dir-tree" name="目录结构">
+    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="tree-title" value="Shannon OS — 项目目录结构" style="text;html=1;fontSize=22;fontStyle=1;align=left;fillColor=none;strokeColor=none;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="400" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-root" value="📁 shannonOS/" style="text;html=1;fontSize=14;fontStyle=1;align=left;fillColor=#f0f0f0;strokeColor=#999;rounded=1;spacingLeft=8;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="800" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-run" value="📄 run.py — 启动入口（venv检查、依赖安装、浏览器打开）" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="105" width="500" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-req" value="📄 requirements.txt — Python依赖" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="127" width="400" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-env" value="📄 .env.example — 环境变量模板" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="149" width="400" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-gitignore" value="📄 .gitignore" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="171" width="200" height="22" as="geometry" />
+        </mxCell>
+        <!-- app/ -->
+        <mxCell id="tree-app" value="📁 app/ — 后端核心" style="text;html=1;fontSize=13;fontStyle=1;align=left;fillColor=#e6f3ff;strokeColor=#6c8ebf;rounded=1;spacingLeft=20;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="800" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-init" value="📄 __init__.py" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="230" width="200" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-main" value="📄 main.py — FastAPI应用入口、路由注册、CORS、SPA托管、生命周期" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="250" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-agent" value="📄 agent.py — ShannonAgent核心：意图分析、计划生成、风险验证、自我修复、ReAct循环" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="272" width="700" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-llm" value="📄 llm_client.py — LLM API调用层：非流式/流式/ToolCall/JSON提取" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="294" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-conv" value="📄 conversation.py — 对话上下文管理器：消息列表、自动截断、智能折叠" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="316" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-prompts" value="📄 prompts.py — 系统提示词：CHAT_RULES、AGENT_RULES、STAGE_HINTS" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="338" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-models" value="📄 models.py — Pydantic数据模型：AgentOutput、ReActCommand/Done/Ask、AgentConfig" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="650" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-executor" value="📄 executor.py — 命令执行引擎：LocalExecutor、SSHExecutor、ExecutorRouter" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="382" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-connection" value="📄 connection.py — SSH连接池：asyncssh+paramiko、自动切换、健康检查、空闲清理" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="404" width="650" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-terminal" value="📄 terminal.py — 终端命令执行、凭证自动加载" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="426" width="500" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-files" value="📄 files.py — 远程文件操作：列表/读取/写入/创建/删除/重命名" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="448" width="550" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-monitor" value="📄 monitor.py — 系统监控：CPU/内存/磁盘/网络/进程数据采集与解析" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="470" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-database" value="📄 database.py — SQLite数据层：主机/会话/操作日志/审计/快照/设置" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="492" width="600" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-security" value="📄 security.py — 密码加密/解密管理器" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="514" width="400" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-settings" value="📄 settings.py — 配置管理：env &gt; yaml &gt; DB &gt; 默认值" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="536" width="500" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-events" value="📄 events.py — SSE事件系统：EventStore（订阅/发布/缓存/重放）" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="558" width="550" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-errors" value="📄 errors.py — 自定义异常 + retry_async异步重试工具" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="580" width="500" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-app-logger" value="📄 logger.py — LLM调用日志记录、API Key脱敏" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="602" width="500" height="20" as="geometry" />
+        </mxCell>
+        <!-- routers/ -->
+        <mxCell id="tree-routers" value="📁 routers/ — API路由层" style="text;html=1;fontSize=12;fontStyle=1;align=left;fillColor=#d5e8d4;strokeColor=#82b366;rounded=1;spacingLeft=40;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="40" y="630" width="700" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-chat" value="📄 chat.py — /api/chat, /api/execute/confirm, /api/stream, /api/conversations" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="658" width="600" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-hosts" value="📄 hosts.py — /api/hosts, /api/host/test, /api/context" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="678" width="500" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-terminal" value="📄 terminal.py — /api/terminal/exec" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="698" width="400" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-files" value="📄 files.py — /api/files/{list,read,write,create,delete,rename}" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="718" width="500" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-monitoring" value="📄 monitoring.py — /api/monitor/{host_id}" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="738" width="400" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-history" value="📄 history.py — /api/history/actions, /api/history/env-snapshots" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="758" width="500" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-r-settings" value="📄 settings.py — /api/settings, /api/settings/test, /api/templates/generate" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="778" width="550" height="18" as="geometry" />
+        </mxCell>
+        <!-- web/ -->
+        <mxCell id="tree-web" value="📁 web/ — 前端 (Vue 3 + Pinia + Vite + TailwindCSS)" style="text;html=1;fontSize=13;fontStyle=1;align=left;fillColor=#fff2cc;strokeColor=#d6b656;rounded=1;spacingLeft=20;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="40" y="810" width="800" height="28" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-pkg" value="📄 package.json — Vue3, Pinia, vue-router, axios, echarts" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="842" width="500" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-vite" value="📄 vite.config.js — Vite配置" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="862" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-tailwind" value="📄 tailwind.config.js / postcss.config.js — TailwindCSS配置" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="882" width="500" height="18" as="geometry" />
+        </mxCell>
+        <!-- web/src/ -->
+        <mxCell id="tree-web-src" value="📁 src/" style="text;html=1;fontSize=12;fontStyle=1;align=left;fillColor=none;strokeColor=none;spacingLeft=40;fontColor=#1a1a2e;" vertex="1" parent="1">
+          <mxGeometry x="40" y="905" width="100" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-main" value="📄 main.js — 应用入口（Vue + Pinia + Router）" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="928" width="400" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-app" value="📄 App.vue — 根组件" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="948" width="300" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-pages" value="📁 pages/ — Dashboard, Servers, Monitoring, Templates, History, Settings, Showcase" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="970" width="600" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-components" value="📁 components/ — Layout.vue, Terminal.vue, FileExplorer.vue" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="990" width="500" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-stores" value="📁 stores/ — server.js, settings.js, history.js, template.js, terminal.js (Pinia)" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1010" width="550" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-services" value="📁 services/ — api.js (axios HTTP客户端)" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1030" width="400" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-router" value="📁 router/ — index.js (Vue Router路由配置)" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1050" width="400" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-composables" value="📁 composables/ — useCharts.js, useVoiceInput.js" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1070" width="400" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="tree-web-styles" value="📁 styles/ — index.css (TailwindCSS)" style="text;html=1;fontSize=10;align=left;fillColor=none;strokeColor=none;spacingLeft=60;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1090" width="300" height="18" as="geometry" />
+        </mxCell>
+        <!-- data/ -->
+        <mxCell id="tree-data" value="📁 data/ — shannon.db (SQLite数据库)" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1120" width="400" height="22" as="geometry" />
+        </mxCell>
+        <!-- logs/ -->
+        <mxCell id="tree-logs" value="📁 logs/ — LLM调用日志 (JSON)" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1145" width="400" height="22" as="geometry" />
+        </mxCell>
+        <!-- scripts/ -->
+        <mxCell id="tree-scripts" value="📁 scripts/ — build.bat, start.sh (构建/启动脚本)" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1170" width="400" height="22" as="geometry" />
+        </mxCell>
+        <!-- web/dist/ -->
+        <mxCell id="tree-dist" value="📁 web/dist/ — 前端构建产物 (SPA静态文件)" style="text;html=1;fontSize=11;align=left;fillColor=none;strokeColor=none;spacingLeft=20;fontColor=#333;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1195" width="400" height="22" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

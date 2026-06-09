@@ -6,7 +6,9 @@
         <div class="page-actions">
           <div class="server-selector">
             <span class="server-label">当前服务器</span>
-            <span class="server-name">{{ currentServer ? currentServer.name : '未选择' }}</span>
+            <span class="server-name" v-if="!serverStore.isMultiMode">{{ currentServer ? currentServer.name : '未选择' }}</span>
+            <span class="server-name" v-else-if="serverStore.selectedServers.length === 0">未选择</span>
+            <span class="server-name" v-else>{{ serverStore.selectedServers.map(s => s.name).join('、') }}</span>
           </div>
           <button @click="toggleSidebar" class="btn btn-outline" title="对话列表">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -25,6 +27,19 @@
           </button>
         </div>
       </div>
+
+        <!-- 多服务器标签栏 -->
+        <div v-if="serverStore.isMultiMode && serverStore.selectedServers.length > 0" class="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg mb-3 overflow-x-auto">
+          <span class="text-xs text-gray-500 flex-shrink-0">📊 已选服务器:</span>
+          <span
+            v-for="server in serverStore.selectedServers"
+            :key="server.id"
+            class="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded-full text-xs border border-gray-200 whitespace-nowrap"
+          >
+            {{ server.name }}
+            <button @click="removeServer(server)" class="ml-1 text-gray-400 hover:text-red-500">&times;</button>
+          </span>
+        </div>
 
       <div class="dashboard-container">
       <div class="chat-main-area">
@@ -48,6 +63,21 @@
         </div>
 
         <div ref="chatContainer" class="chat-messages">
+        <!-- 批量 Tab 面板 -->
+        <div v-if="serverStore.isMultiMode && batchTabs.length > 0" class="mb-4">
+          <div class="flex border-b border-gray-200 gap-0">
+            <button
+              v-for="tab in batchTabs"
+              :key="tab.hostId"
+              @click="activeTab = tab.hostId"
+              class="px-4 py-2 text-xs font-medium border-b-2 transition-colors"
+              :class="activeTab === tab.hostId ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+            >
+              <span class="mr-1">{{ tab.status === 'running' ? '🔵' : tab.status === 'success' ? '🟢' : tab.status === 'failed' ? '🔴' : '🟡' }}</span>
+              {{ tab.name }}
+            </button>
+          </div>
+        </div>
           <div
             v-for="(message, index) in messages"
             :key="index"
@@ -71,9 +101,36 @@
                 </div>
                 <span class="message-sender">{{ message.role === 'user' ? '你' : 'Shannon' }}</span>
               </div>
-              <div class="message-content">{{ message.content }}</div>
+              <div class="message-content" v-html="renderMarkdown(message.content)"></div>
 
-              <div v-if="message.meta && message.meta.plan" class="plan-section">
+              <!-- 委托卡片（嵌入聊天流） -->
+              <DelegationCard
+                v-if="message.meta && message.meta._delegationActive"
+                :visible="delegationState.visible"
+                :state="delegationState.state"
+                :agent="delegationState.agent"
+                :reason="delegationState.reason"
+                :risk-level="delegationState.riskLevel"
+                :goal-achieved="delegationState.goalAchieved"
+                :goal-reasoning="delegationState.goalReasoning"
+                :execution-time="delegationState.executionTime"
+                :files-changed="delegationState.filesChanged"
+                :files-changed-count="delegationState.filesChangedCount"
+                :risk-warnings="delegationState.riskWarnings"
+                :output-summary="delegationState.outputSummary"
+                :output-lines="delegationState.outputLines"
+                :message="delegationState.message"
+                :waiting-permission="delegationState.waitingPermission"
+                :permission-prompt="delegationState.permissionPrompt"
+                :permission-id="delegationState.permissionId"
+                :auto-approved="delegationState.autoApproved"
+                @delegate="confirmDelegation(delegationState.currentTaskId)"
+                @reject="rejectDelegation(delegationState.currentTaskId)"
+                @cancel="cancelDelegation(delegationState.currentTaskId)"
+                @respond-permission="respondPermission"
+              />
+
+              <div v-if="message.meta && message.meta.plan && !message.meta._delegationActive" class="plan-section">
                 <div class="plan-header">
                   <h4 class="plan-title">执行计划</h4>
                   <span class="risk-badge" :class="message.meta.plan.risk_level === 'HIGH' ? 'risk-high' : 'risk-low'">
@@ -163,6 +220,12 @@
               </div>
             </div>
           </div>
+        <!-- 批量状态栏 -->
+        <div v-if="serverStore.isMultiMode && batchTabs.length > 0" class="flex items-center gap-3 px-3 py-1.5 bg-gray-100 rounded text-xs text-gray-600 mt-2">
+          <span>🟢 成功 {{ batchSuccessCount }}</span>
+          <span>🔵 执行中 {{ batchRunningCount }}</span>
+          <span>🔴 失败 {{ batchFailedCount }}</span>
+        </div>
         </div>
 
         <div class="chat-input-area">
@@ -179,6 +242,14 @@
                 {{ mode.label }}
               </button>
             </div>
+          <!-- ReAct Toggle（仅多服务器时显示） -->
+          <label v-if="serverStore.isMultiMode" class="flex items-center gap-1.5 cursor-pointer text-xs">
+            <span class="text-gray-500">ReAct</span>
+            <div class="relative">
+              <input type="checkbox" v-model="reactEnabled" class="sr-only peer" />
+              <div class="w-8 h-4 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-indigo-600"></div>
+            </div>
+          </label>
           </div>
           <textarea
             v-model="prompt"
@@ -414,18 +485,36 @@
         </div>
       </div>
     </div>
+
+    <!-- 委托相关弹窗 -->
+    <DelegationInstallModal
+      :visible="delegationInstallModal.visible"
+      :host-name="delegationInstallModal.hostName"
+      @install="confirmInstall"
+      @reject="rejectInstall"
+      @close="delegationInstallModal.visible = false"
+    />
+    <DelegationConflictModal
+      :visible="delegationConflictModal.visible"
+      @cancel-and-new="resolveConflictCancelAndNew"
+      @queue="resolveConflictQueue"
+    />
   </Layout>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick, reactive, watch } from 'vue'
+import { renderMarkdown } from '../composables/markdown.js'
 import { useRouter } from 'vue-router'
 import Layout from '../components/layout/Layout.vue'
 import { useServerStore } from '../stores/server'
 import { useTemplateStore } from '../stores/template'
 import { useTerminalStore } from '../stores/terminal'
-import { chatApi, settingsApi } from '../services/api'
+import { chatApi, settingsApi, delegateApi } from '../services/api'
 import { useVoiceInput } from '../composables/useVoiceInput'
+import DelegationCard from '../components/DelegationCard.vue'
+import DelegationInstallModal from '../components/DelegationInstallModal.vue'
+import DelegationConflictModal from '../components/DelegationConflictModal.vue'
 
 const router = useRouter()
 const serverStore = useServerStore()
@@ -443,6 +532,74 @@ const apiKeySet = ref(true)
 const serverPassword = ref('')
 const rememberPassword = ref(true)
 const currentSSE = ref(null)
+
+const reactEnabled = ref(true)
+const batchTabs = ref([])
+const activeTab = ref(null)
+const batchOutputs = ref({})
+
+const batchSuccessCount = computed(() => batchTabs.value.filter(t => t.status === 'success').length)
+const batchRunningCount = computed(() => batchTabs.value.filter(t => t.status === 'running').length)
+const batchFailedCount = computed(() => batchTabs.value.filter(t => t.status === 'failed').length)
+
+// 委托状态管理
+const delegationState = reactive({
+  visible: false,
+  state: 'suggested', // suggested | running | completed | cancelled | timeout | fallback
+  agent: 'Claude Code',
+  reason: '',
+  riskLevel: 'LOW',
+  riskReason: '',
+  goalAchieved: '',
+  goalReasoning: '',
+  executionTime: 0,
+  filesChanged: [],
+  filesChangedCount: 0,
+  riskWarnings: [],
+  outputSummary: '',
+  outputLines: [],
+  stderr: '',
+  exitCode: null,
+  message: '',
+  currentTaskId: null,
+  pendingConfirmTaskId: null,
+  waitingPermission: false,
+  permissionPrompt: '',
+  permissionId: '',
+  autoApproved: false,
+})
+const delegationInstallModal = reactive({
+  visible: false,
+  hostName: '',
+  taskId: null,
+})
+const delegationConflictModal = reactive({
+  visible: false,
+  existingTaskId: '',
+  newTaskId: '',
+})
+
+function removeServer(server) {
+  serverStore.selectedServers = serverStore.selectedServers.filter(s => s.id !== server.id)
+}
+
+function initBatchTabs() {
+  batchTabs.value = serverStore.selectedServers.map(s => ({
+    hostId: s.id,
+    name: s.name,
+    status: 'pending',
+    output: '',
+  }))
+  activeTab.value = serverStore.selectedServers[0]?.id || null
+  batchOutputs.value = {}
+}
+
+function updateBatchTab(hostId, status, line) {
+  const tab = batchTabs.value.find(t => t.hostId === hostId)
+  if (tab) tab.status = status
+  if (!batchOutputs.value[hostId]) batchOutputs.value[hostId] = []
+  if (line) batchOutputs.value[hostId].push(line)
+}
 
 // 对话管理
 const conversations = ref([])
@@ -674,6 +831,13 @@ const confirmPassword = async () => {
     return
   }
 
+  // 多服务器模式：将密码缓存到所有已选服务器
+  if (serverStore.isMultiMode) {
+    serverStore.selectedServers.forEach(s => {
+      serverStore.setServerPassword(s.id, serverPassword.value)
+    })
+  }
+
   showPasswordModal.value = false
   const userMessage = {
     role: 'user',
@@ -687,7 +851,7 @@ const confirmPassword = async () => {
   loading.value = true
 
   try {
-    const response = await chatApi.sendMessage(userPrompt, selectedMode.value, {
+    const hostPayload = {
       id: currentServer.value.id,
       name: currentServer.value.name,
       host: currentServer.value.host,
@@ -696,7 +860,22 @@ const confirmPassword = async () => {
       password: serverPassword.value,
       private_key: '',
       use_local: false
-    }, activeConversationId.value)
+    }
+
+    const hostsPayload = serverStore.isMultiMode
+      ? serverStore.selectedServers.map(s => ({
+          id: s.id, name: s.name, host: s.host, port: s.port,
+          username: s.username,
+          password: serverStore.serverPasswords[s.id] || serverPassword.value || '',
+          private_key: '', use_local: false
+        }))
+      : null
+
+    if (serverStore.isMultiMode) {
+      initBatchTabs()
+    }
+
+    const response = await chatApi.sendMessage(userPrompt, selectedMode.value, hostPayload, activeConversationId.value, reactEnabled.value, hostsPayload)
 
     const taskId = response.data.task_id
     const status = response.data.status
@@ -768,20 +947,23 @@ const startSSE = async (taskId) => {
       }
     } else if (payload.type === 'command_result') {
       terminalStore.addEvent(payload)
-      assistantMessage.meta.events.push(payload)
-      if (payload.stdout || payload.stderr) {
-        let formattedOutput = `### 执行命令\n\`\`\`bash\n${payload.command}\n\`\`\``
-        if (payload.stdout) {
-          formattedOutput += `\n\n### 标准输出\n\`\`\`\n${payload.stdout}\n\`\`\``
-        }
-        if (payload.stderr) {
-          formattedOutput += `\n\n### 错误输出\n\`\`\`\n${payload.stderr}\n\`\`\``
-        }
-        assistantMessage.content = payload.reply_message || formattedOutput
+      if (payload.host_id) updateBatchTab(payload.host_id, payload.returncode === 0 ? 'success' : 'failed', null)
+      let formattedOutput = `### 执行完成\n\`\`\`bash\n${payload.command}\n\`\`\``
+      if (payload.stdout) {
+        formattedOutput += `\n\n### 标准输出\n\`\`\`\n${payload.stdout}\n\`\`\``
       }
+      if (payload.stderr) {
+        formattedOutput += `\n\n### 错误输出\n\`\`\`\n${payload.stderr}\n\`\`\``
+      }
+      const resultMsg = reactive({
+        role: 'assistant',
+        content: payload.reply_message || formattedOutput,
+        meta: { type: 'command_result', command: payload.command, returncode: payload.returncode, iteration: assistantMessage.meta.currentIteration || 1 }
+      })
+      messages.value.push(resultMsg)
     } else if (payload.type === 'command_start') {
       terminalStore.addEvent(payload)
-      assistantMessage.meta.events.push(payload)
+      if (payload.host_id) updateBatchTab(payload.host_id, 'running', null)
       let cmdContent = `### 正在执行\n\`\`\`bash\n${payload.command}\n\`\`\``
       if (payload.reasoning) {
         cmdContent = `**思考:** ${payload.reasoning}\n\n${cmdContent}`
@@ -789,15 +971,23 @@ const startSSE = async (taskId) => {
       if (payload.purpose) {
         cmdContent += `\n\n**目的:** ${payload.purpose}`
       }
-      assistantMessage.content = cmdContent
+      const cmdMsg = reactive({
+        role: 'assistant',
+        content: cmdContent,
+        meta: { type: 'command_start', command: payload.command, purpose: payload.purpose, reasoning: payload.reasoning, iteration: assistantMessage.meta.currentIteration || 1 }
+      })
+      messages.value.push(cmdMsg)
     } else if (payload.type === 'command_output') {
-      assistantMessage.meta.events.push(payload)
-      // 显示最近若干行实时输出
-      const lines = assistantMessage.meta.events
-        .filter(e => e.type === 'command_output')
-        .slice(-20)
-        .map(e => e.line.endsWith('\n') ? e.line : e.line + '\n')
-      assistantMessage.content = `### 命令执行中\n\`\`\`\n${lines.join('')}\`\`\``
+      // 实时流式输出：更新最后一条消息
+      const lastMsg = messages.value[messages.value.length - 1]
+      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.meta.type === 'command_start') {
+        const lines = (lastMsg.meta._streamLines || [])
+        const line = payload.line.endsWith('\n') ? payload.line : payload.line + '\n'
+        lines.push(line)
+        if (lines.length > 20) lines.splice(0, lines.length - 20)
+        lastMsg.meta._streamLines = lines
+        lastMsg.content = `### 命令执行中\n\`\`\`bash\n${payload.command}\n\`\`\`\n\`\`\`\n${lines.join('')}\`\`\``
+      }
     } else if (payload.type === 'self_heal_retry') {
       terminalStore.addEvent(payload)
       assistantMessage.meta.events.push(payload)
@@ -816,30 +1006,40 @@ const startSSE = async (taskId) => {
       }
       assistantMessage.content = content
     } else if (payload.type === 'react_done') {
-      assistantMessage.content = payload.message || '执行完成'
-      assistantMessage.meta._sse_done = true
+      const doneMsg = reactive({
+        role: 'assistant',
+        content: payload.message || '执行完成',
+        meta: { _sse_done: true }
+      })
+      messages.value.push(doneMsg)
       currentSSE.value.close()
       loadConversations()
     } else if (payload.type === 'react_ask') {
-      assistantMessage.content = `**需要你的帮助:** ${payload.message}`
-      if (payload.reasoning) {
-        assistantMessage.content += `\n\n**思考:** ${payload.reasoning}`
-      }
+      const askMsg = reactive({
+        role: 'assistant',
+        content: `**需要你的帮助:** ${payload.message}` + (payload.reasoning ? `\n\n**思考:** ${payload.reasoning}` : ''),
+        meta: {}
+      })
+      messages.value.push(askMsg)
     } else if (payload.type === 'status' && payload.message === '正在执行命令...') {
       assistantMessage.content = '### 正在执行命令...\n\n请稍候，命令执行中...'
     } else if (payload.type === 'done') {
-      let finalContent = payload.message || assistantMessage.content
+      let finalContent = payload.message || ''
       if (payload.stdout) {
         finalContent += `\n\n### 最终输出\n\`\`\`\n${payload.stdout}\n\`\`\``
       }
       if (payload.stderr) {
         finalContent += `\n\n### 错误信息\n\`\`\`\n${payload.stderr}\n\`\`\``
       }
-      assistantMessage.content = finalContent
-      assistantMessage.meta.pendingConfirmation = false
-      assistantMessage.meta._sse_done = true
+      if (finalContent) {
+        const doneMsg = reactive({
+          role: 'assistant',
+          content: finalContent,
+          meta: { _sse_done: true }
+        })
+        messages.value.push(doneMsg)
+      }
       currentSSE.value.close()
-      // 刷新对话列表（新消息更新了 updated_at）
       loadConversations()
     } else if (payload.type === 'risk_hold') {
       assistantMessage.content = payload.reason || '请确认执行以下命令'
@@ -853,6 +1053,106 @@ const startSSE = async (taskId) => {
     } else if (payload.type === 'confirmation_accepted' || payload.type === 'confirmation_cancelled') {
       assistantMessage.meta.pendingConfirmation = false
       assistantMessage.meta.isExecuting = payload.type === 'confirmation_accepted'
+    // ── 委托事件处理 ──
+    } else if (payload.type === 'delegate_confirm_required') {
+      // 预判器命中 或 LLM 建议委托 → 展示确认卡片，等待用户选择
+      delegationState.visible = true
+      delegationState.state = 'suggested'
+      delegationState.agent = payload.agent || 'Claude Code'
+      delegationState.reason = payload.reason || payload.message || ''
+      delegationState.riskLevel = payload.risk_level || 'HIGH'
+      delegationState.currentTaskId = payload.task_id || taskId
+      delegationState.pendingConfirmTaskId = payload.task_id || taskId
+      assistantMessage.content = ''
+      assistantMessage.meta._delegationActive = true
+      assistantMessage.meta._delegationState = 'suggested'
+    } else if (payload.type === 'delegate_suggested') {
+      // 兼容旧事件：仅作信息提示，不展示操作按钮
+      delegationState.agent = payload.agent || 'Claude Code'
+      delegationState.reason = payload.reason || payload.message || ''
+    } else if (payload.type === 'delegate_started') {
+      delegationState.state = 'running'
+      delegationState.outputLines = []
+      delegationState.waitingPermission = false
+      delegationState.permissionPrompt = ''
+      delegationState.permissionId = ''
+      delegationState.visible = true
+      assistantMessage.meta._delegationActive = true
+      assistantMessage.meta._delegationState = 'running'
+      assistantMessage.content = `### 委托执行中 - ${payload.agent || 'Claude Code'}\n\n正在远程服务器上执行...`
+    } else if (payload.type === 'delegate_progress') {
+      // 流式输出，追加到 outputLines
+      delegationState.outputLines.push(payload.line || '')
+      if (delegationState.outputLines.length > 200) {
+        delegationState.outputLines = delegationState.outputLines.slice(-150)
+      }
+      // 聊天区直接累积 Claude Code 输出（后端已 strip ANSI），markdown 渲染
+      if (!assistantMessage.meta._ccOutput) assistantMessage.meta._ccOutput = []
+      assistantMessage.meta._ccOutput.push(payload.line || '')
+      if (assistantMessage.meta._ccOutput.length > 500) {
+        assistantMessage.meta._ccOutput = assistantMessage.meta._ccOutput.slice(-400)
+      }
+      assistantMessage.content = `### 委托执行中 - ${delegationState.agent}\n\n${assistantMessage.meta._ccOutput.join('\n')}`
+    } else if (payload.type === 'delegate_permission_required') {
+      delegationState.waitingPermission = true
+      delegationState.permissionPrompt = payload.prompt_text || ''
+      delegationState.permissionId = payload.permission_id || ''
+      delegationState.autoApproved = payload.auto_approved || false
+    } else if (payload.type === 'delegate_completed') {
+      delegationState.waitingPermission = false
+      delegationState.state = 'completed'
+      delegationState.executionTime = payload.execution_time_sec || 0
+      assistantMessage.meta._delegationState = 'completed'
+    } else if (payload.type === 'delegate_review') {
+      delegationState.goalAchieved = payload.goal_achieved || '⚠️ 部分达成'
+      delegationState.goalReasoning = payload.goal_reasoning || ''
+      delegationState.filesChanged = payload.files_changed || []
+      delegationState.filesChangedCount = (payload.files_changed || []).length
+      delegationState.riskWarnings = payload.risk_warnings || []
+      delegationState.outputSummary = payload.output_summary || ''
+      delegationState.stderr = payload.stderr || ''
+      delegationState.exitCode = payload.exit_code
+      let reviewContent = `### 委托执行完成\n\n**目标达成:** ${delegationState.goalAchieved}\n**耗时:** ${delegationState.executionTime}秒\n**退出码:** ${payload.exit_code ?? '未知'}\n**变更文件:** ${delegationState.filesChangedCount}个`
+      if (delegationState.goalReasoning) {
+        reviewContent += `\n\n**判断理由:** ${delegationState.goalReasoning}`
+      }
+      if (delegationState.riskWarnings.length > 0) {
+        reviewContent += `\n\n⚠️ **风险警告:**\n${delegationState.riskWarnings.map(w => `- ${w}`).join('\n')}`
+      }
+      if (delegationState.stderr) {
+        reviewContent += `\n\n### 错误输出\n\`\`\`\n${delegationState.stderr}\n\`\`\``
+      }
+      if (delegationState.outputSummary) {
+        reviewContent += `\n\n### 执行摘要\n${delegationState.outputSummary}`
+      }
+      assistantMessage.content = reviewContent
+      assistantMessage.meta._delegationDone = true
+    } else if (payload.type === 'delegate_cancelled') {
+      delegationState.state = 'cancelled'
+      delegationState.message = payload.message || '委托已被取消'
+      assistantMessage.content = `### 委托已取消\n\n${delegationState.message}`
+      assistantMessage.meta._delegationDone = true
+    } else if (payload.type === 'delegate_timeout') {
+      delegationState.state = 'timeout'
+      delegationState.message = payload.message || '委托执行超时'
+      assistantMessage.content = `### 委托超时\n\n${delegationState.message}`
+      assistantMessage.meta._delegationDone = true
+    } else if (payload.type === 'delegate_fallback') {
+      delegationState.state = 'fallback'
+      delegationState.message = payload.message || '已退回 Agent 模式'
+      assistantMessage.content = `### ${delegationState.message}`
+      assistantMessage.meta._delegationDone = true
+    } else if (payload.type === 'delegate_install_required') {
+      delegationInstallModal.visible = true
+      delegationInstallModal.hostName = payload.host_name || '目标服务器'
+      delegationInstallModal.taskId = taskId
+      assistantMessage.content = `### 需要安装 Claude Code CLI\n\n${payload.message}`
+      assistantMessage.meta._delegationPendingInstall = true
+    } else if (payload.type === 'delegation_conflict') {
+      delegationConflictModal.visible = true
+      delegationConflictModal.existingTaskId = payload.existing_task_id || ''
+      delegationConflictModal.newTaskId = taskId
+      assistantMessage.meta._delegationConflict = true
     } else if (payload.type === 'error') {
       assistantMessage.content = `错误: ${payload.message || '未知错误'}`
       assistantMessage.meta.pendingConfirmation = false
@@ -907,6 +1207,89 @@ const cancelExecution = async (taskId) => {
     await chatApi.confirmExecution(taskId, false, 'Shannon User')
   } catch (error) {
     console.error('取消执行失败:', error)
+  }
+}
+
+// ── 委托操作方法 ──
+const confirmDelegation = async (taskId) => {
+  try {
+    await chatApi.confirmExecution(taskId, true, 'Shannon User')
+    delegationState.state = 'running'
+  } catch (error) {
+    console.error('确认委托失败:', error)
+    delegationState.state = 'fallback'
+  }
+}
+
+const rejectDelegation = async (taskId) => {
+  try {
+    await chatApi.confirmExecution(taskId, false, 'Shannon User')
+    delegationState.state = 'fallback'
+  } catch (error) {
+    console.error('拒绝委托失败:', error)
+  }
+}
+
+const cancelDelegation = async (taskId) => {
+  try {
+    await delegateApi.cancel(taskId)
+    delegationState.state = 'cancelled'
+  } catch (error) {
+    console.error('取消委托失败:', error)
+  }
+}
+
+const respondPermission = async (permissionId, approved) => {
+  const taskId = delegationState.currentTaskId
+  if (!taskId) return
+  try {
+    await delegateApi.respondPermission(taskId, permissionId, approved)
+    delegationState.waitingPermission = false
+    delegationState.permissionPrompt = ''
+    delegationState.permissionId = ''
+  } catch (error) {
+    console.error('响应权限请求失败:', error)
+  }
+}
+
+const confirmInstall = async () => {
+  if (!delegationInstallModal.taskId) return
+  try {
+    await delegateApi.confirmInstall(delegationInstallModal.taskId, true)
+    delegationInstallModal.visible = false
+  } catch (error) {
+    console.error('确认安装失败:', error)
+  }
+}
+
+const rejectInstall = async () => {
+  if (!delegationInstallModal.taskId) return
+  try {
+    await delegateApi.confirmInstall(delegationInstallModal.taskId, false)
+    delegationInstallModal.visible = false
+  } catch (error) {
+    console.error('拒绝安装失败:', error)
+  }
+}
+
+const resolveConflictCancelAndNew = async () => {
+  try {
+    await delegateApi.resolveConflict(delegationConflictModal.newTaskId, 'cancel_and_new')
+    delegationConflictModal.visible = false
+    // SSE 连接保持存活，后端会用同一 task_id 重新生成消息
+    // 前端已连接在该 task_id 的 SSE 流上，会自动收到新事件
+  } catch (error) {
+    console.error('解决冲突失败:', error)
+  }
+}
+
+const resolveConflictQueue = async () => {
+  try {
+    await delegateApi.resolveConflict(delegationConflictModal.newTaskId, 'queue')
+    delegationConflictModal.visible = false
+    // SSE 连接保持存活，等待当前委托完成后自动处理排队消息
+  } catch (error) {
+    console.error('排队失败:', error)
   }
 }
 

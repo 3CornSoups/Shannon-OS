@@ -19,40 +19,17 @@ AGENT_RULES = [
     "commands_plan 是数组，每项包含 command 和 purpose。",
     "risk_level 只能是 LOW 或 HIGH。",
     "",
-    "=== 核心原则 ===",
-    "任何修改系统状态、操作文件系统、变更配置的操作都应视为高风险。",
-    "只有纯读取/查询类命令才应标记为 LOW。",
-    "",
-    "=== HIGH 风险命令（必须标记）===",
-    "  - 用户/组管理：useradd, userdel, usermod, groupadd, groupdel, passwd（创建、删除、修改用户或密码）",
-    "  - 权限变更：chmod, chown, chgrp（任何权限修改，不仅是 777）",
-    "  - 文件/目录删除：rm, rm -rf, rmdir（删除任何文件或目录）",
-    "  - 系统配置文件修改：修改 /etc/ 下的任何文件（passwd, shadow, sudoers, fstab, profile, hosts, ssh, nginx 等）",
-    "  - 服务管理：systemctl, service, init.d（启停系统服务）",
-    "  - 网络/防火墙：iptables, firewalld, ufw, nft（修改网络或防火墙规则）",
-    "  - 软件包管理：yum, apt-get, apt, dpkg, rpm, pip install --system, npm install -g（安装/卸载/更新软件包）",
-    "  - 内核/驱动：modprobe, rmmod, insmod（加载或卸载内核模块）",
-    "  - 磁盘操作：dd, shred, mkfs, fdisk, parted, mount, umount（格式化、分区、挂载）",
-    "  - 重启/关机：reboot, shutdown, poweroff, init, halt",
-    "  - SSH密钥操作：ssh-keygen, ssh-copy-id, 修改 ~/.ssh",
-    "  - 定时任务：crontab, cron（添加或修改定时任务）",
-    "  - 进程管理：kill -9, killall, pkill（强制结束进程）",
-    "  - 远程下载执行：curl|sh, wget|bash（从网络下载脚本并执行）",
-    "  - Docker 高危操作：docker rm -f, docker system prune, docker volume rm, docker run --privileged",
-    "  - sudo 特权操作：任何通过 sudo 执行的命令",
-    "  - 原地修改文件：sed -i（直接修改文件内容）",
-    "  - 写入系统路径：使用 > 或 >> 向 /usr/, /bin/, /sbin/, /lib/, /opt/ 写入",
-    "",
-    "LOW 风险命令（仅限纯读取/查询）包括：",
-    "  - 信息查询：who, w, last, ps, top, df, free, uname, hostname, id, whoami",
-    "  - 文件读取：cat, head, tail, less, grep, find, ls（不修改文件的只读操作）",
-    "  - 网络检查：ping, curl, wget, netstat, ss, ip addr, ip route, nslookup, dig（仅查看，不修改）",
-    "  - 系统信息：uptime, arch, env, history, date, cal",
-    "  - 目录操作：cd, pwd（纯导航）",
-    "  - 变量读取：echo, printf, which, type（仅输出信息）",
-    "",
-    "重要：创建目录（mkdir）、创建文件（touch）、复制（cp）、移动（mv）除非是到临时路径，否则也属于 HIGH。",
-    "高危命令必须在 reasoning 中详细说明风险原因和具体影响。",
+    "=== ⚠️ 风险标注（直接影响是否自动执行）===\n"
+    "每次调用 execute_command 必须标注 risk_level：\n"
+    "  - LOW = 纯只读查询：cat、ls、df、ps、find、grep、id、which、echo、stat、head、tail、wc\n"
+    "  - HIGH = 任何修改系统状态的操作，包括但不限于：\n"
+    "    • 用户管理：useradd、userdel、usermod、passwd、groupadd\n"
+    "    • 软件管理：apt install/remove、yum install/remove、pip install、npm install -g\n"
+    "    • 服务管理：systemctl start/stop/restart/enable、service start/stop\n"
+    "    • 文件修改：rm、sed -i、>（覆盖）、>>（追加到系统文件）、chmod、chown\n"
+    "    • 目录/文件创建删除：mkdir、touch、mv、cp（到系统路径）\n"
+    "  - 即使是组合命令（如 useradd && usermod && id），只要包含任何 HIGH 操作，整个命令就是 HIGH\n"
+    "  - 不确定时标 HIGH。LOW 标错后果严重（自动执行了危险操作），HIGH 标错只是多一次确认点击。",
     "",
     "=== 命令效率规则（重要）===",
     "合并相关操作为一个命令：用 && 或 ; 连接多个步骤，减少执行轮次。",
@@ -84,12 +61,28 @@ STAGE_HINTS = {
     "react": (
         "当前阶段: ReAct 执行循环--执行命令、观察结果、决定下一步。\n"
         "=== ReAct 循环规则 ===\n"
-        "你有三个工具可以使用（直接在 function calling 中选择）：\n"
+        "你有四个工具可以使用（直接在 function calling 中选择）：\n"
         '  1. execute_command: 在服务器上执行 shell 命令\n'
         '  2. task_done: 任务完成，向用户汇报最终结果\n'
-        '  3. ask_user: 需要用户帮助时使用\n\n'
+        '  3. ask_user: 需要用户帮助时使用\n'
+        '  4. delegate_task: 将代码相关任务委托给 Claude Code 执行\n\n'
         "命令执行结果会以用户消息形式返回，格式为「## 命令执行结果」,\n"
         "包含返回码、标准输出、错误输出。请仔细阅读后再决定下一步。\n\n"
+        "=== 委托判断原则（重要）===\n"
+        "优先级规则：涉及代码理解的任务，优先使用 delegate_task，不要试图用 find/grep/wc 等 shell 命令拼凑分析。\n"
+        "Claude Code 能深度理解代码语义、跨文件追踪引用、识别模式，远优于简单 shell 命令组合。\n\n"
+        "适合委托（一律走 delegate_task）：\n"
+        "- 代码分析与审计：代码结构分析、重复代码检测、耦合度分析、代码质量评估、安全审计\n"
+        "- 代码重构：模块拆分、架构调整、公共逻辑提取、多文件编辑\n"
+        "- 代码理解：依赖分析、代码审查、跨文件语义追踪、架构评估报告\n"
+        "- 编写与优化：构建脚本、Dockerfile、CI 配置、自动化脚本\n"
+        "- 代码级 bug 修复与定位\n\n"
+        "不适合委托（自己用 execute_command 做）：\n"
+        "- 单条 shell 运维操作\n"
+        "- 系统状态查询（df/free/uptime 等）\n"
+        "- 软件包安装、服务启停\n\n"
+        "即使任务要求「只分析不修改」，也必须委托给 Claude Code——它能写出更专业、更完整的分析报告。\n"
+        "复合任务（如查日志+改 bug）：先 execute_command 查 → 拿到上下文 → 再决定是否委托。\n\n"
         "终止条件：\n"
         "- 原始目标已达成 → task_done\n"
         "- 遇到不可恢复的错误 → task_done 并说明原因\n"
@@ -99,23 +92,47 @@ STAGE_HINTS = {
         "- 命令失败时诊断原因，尝试替代方案\n"
         "- 禁止用相同参数重复重试相同的失败命令\n"
         "- 尽量用 && 或 ; 合并相关操作\n"
-        "- 最多 20 轮迭代，请高效决策"
+        "- 最多 40 轮迭代，请高效决策"
     ),
 }
 
 DEFAULT_STAGE = "当前阶段: 通用。"
 
 
-def build_system_prompt(mode: str, host_context: dict, stage: str) -> str:
+def build_system_prompt(mode: str, host_context: dict, stage: str, metrics_text: str = "", hosts_context: list[dict] | None = None, available_tools_text: str = "") -> str:
     """构建完整的 system prompt，根据模式选择不同规则集"""
     import json
     if mode == "chat":
         rules = "\n".join(CHAT_RULES)
-        stage_hint = ""  # chat 模式下不需要 stage 提示
+        stage_hint = ""
     else:
         rules = "\n".join(AGENT_RULES)
         stage_hint = STAGE_HINTS.get(stage, DEFAULT_STAGE)
     context_text = json.dumps(host_context, ensure_ascii=False)
-    return (
-        f"{rules}\n运行模式: {mode}\n{stage_hint}\n主机上下文: {context_text}"
-    )
+    prompt = f"{rules}\n运行模式: {mode}\n{stage_hint}\n主机上下文: {context_text}"
+    if available_tools_text:
+        prompt += available_tools_text
+    if metrics_text:
+        prompt += f"\n{metrics_text}"
+    if hosts_context and len(hosts_context) > 0:
+        prompt += f"\n\n当前目标服务器列表（共 {len(hosts_context)} 台）:\n"
+        for h in hosts_context:
+            prompt += f"  - {h.get('name', '')} ({h.get('host', '')}), OS: {h.get('os', '未知')}, 发行版: {h.get('distro', '未知')}\n"
+        if mode != "chat":
+            prompt += (
+                "\n=== 多服务器模式选择规则 ===\n"
+                "请先分析用户意图，选择正确的执行模式：\n\n"
+                '1. 统一计划模式 (execution_mode: "unified")：\n'
+                "   - 条件：任务在所有服务器上的操作逻辑相同或高度相似\n"
+                "   - 做法：生成 1 套命令计划，用 Shell 条件判断（if/elif）适配 OS 差异\n"
+                '   - 示例："安装 Java"、"查看系统信息"、"检查磁盘使用率"\n\n'
+                '2. 独立 ReAct 模式 (execution_mode: "independent")：\n'
+                "   - 条件：不同服务器需要执行本质上不同的操作\n"
+                "   - 做法：为每台服务器生成独立的 commands_plan (host_id -> commands_plan 映射)\n"
+                '   - 示例："检查所有服务器日志错误"、"A 服务器重启 Nginx, B 清理日志"\n\n'
+                '请在 JSON 输出中增加 "execution_mode" 字段：值必须是 "unified" 或 "independent"。\n'
+                "对于因 OS 差异无法统一的命令（如包安装），请使用 Shell 条件判断（if/elif）适配不同发行版。\n"
+                "对于各服务器统一的命令（如 df -h、uname -a），直接生成通用命令即可。\n"
+                "你的任务将在以上所有服务器上并行执行，每台服务器各自解析 Shell 条件分支。"
+            )
+    return prompt

@@ -459,17 +459,28 @@ function closeContextMenu() {
 
 onMounted(() => {
   document.addEventListener('click', closeContextMenu)
+  tryAutoSelect()
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeContextMenu)
+})
+
+function tryAutoSelect() {
   if (servers.value.length > 0 && !selectedServerId.value) {
     const stored = localStorage.getItem('shannon_file_server')
     if (stored && servers.value.find(s => s.id === parseInt(stored))) {
       selectedServerId.value = parseInt(stored)
       onServerChange()
+    } else {
+      selectedServerId.value = servers.value[0].id
+      onServerChange()
     }
   }
-})
+}
 
-onUnmounted(() => {
-  document.removeEventListener('click', closeContextMenu)
+watch(() => servers.value.length, () => {
+  tryAutoSelect()
 })
 
 watch(selectedServerId, (val) => {

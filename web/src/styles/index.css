@@ -273,6 +273,99 @@ textarea.input {
 .bg-warning { background-color: var(--warning) !important; }
 .bg-info { background-color: var(--info) !important; }
 
+/* ── Markdown 渲染内容样式（v-html 渲染，scoped 不生效，放全局）── */
+.message-content h1, .message-content h2, .message-content h3,
+.message-content h4, .message-content h5, .message-content h6,
+.answer-content h1, .answer-content h2, .answer-content h3,
+.answer-content h4, .answer-content h5, .answer-content h6 {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+.message-content h1, .answer-content h1 { font-size: 1.25em; }
+.message-content h2, .answer-content h2 { font-size: 1.15em; }
+.message-content h3, .answer-content h3 { font-size: 1.05em; }
+.message-content h4, .answer-content h4 { font-size: 1em; }
+
+.message-content p, .answer-content p { margin: 4px 0 8px; }
+.message-content p:last-child, .answer-content p:last-child { margin-bottom: 0; }
+
+.message-content strong, .answer-content strong { font-weight: 600; }
+
+.message-content code, .answer-content code {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 0.9em;
+}
+.message-content pre, .answer-content pre {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.message-content pre code, .answer-content pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85em;
+  color: inherit;
+}
+
+.message-content ul, .message-content ol,
+.answer-content ul, .answer-content ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+.message-content li, .answer-content li { margin-bottom: 2px; }
+
+.message-content blockquote, .answer-content blockquote {
+  border-left: 3px solid var(--primary);
+  padding: 6px 12px;
+  margin: 8px 0;
+  background: var(--primary-lighter);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-secondary);
+}
+
+.message-content table, .answer-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+  font-size: 0.9em;
+}
+.message-content th, .message-content td,
+.answer-content th, .answer-content td {
+  border: 1px solid var(--bg-border);
+  padding: 6px 10px;
+  text-align: left;
+}
+.message-content th, .answer-content th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+.message-content a, .answer-content a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.message-content hr, .answer-content hr {
+  border: none;
+  border-top: 1px solid var(--bg-border);
+  margin: 12px 0;
+}
+
+.message-content img, .answer-content img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+
 @media (max-width: 768px) {
   .container {
     padding-left: 16px;

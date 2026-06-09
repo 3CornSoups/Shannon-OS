@@ -168,6 +168,28 @@
         </div>
       </div>
 
+    <!-- 历史查询时间选择器 -->
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-white rounded-lg border border-gray-200 mb-4 shadow-sm">
+      <span class="text-sm text-gray-600 font-medium">历史趋势：</span>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="opt in timeRangeOptions"
+          :key="opt.value"
+          @click="selectedTimeRange = opt.value; fetchHistory()"
+          class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+          :class="selectedTimeRange === opt.value ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div v-if="selectedTimeRange === 'custom'" class="flex items-center gap-2">
+        <input type="datetime-local" v-model="customFrom" class="input text-xs w-44" />
+        <span class="text-xs text-gray-400">至</span>
+        <input type="datetime-local" v-model="customTo" class="input text-xs w-44" />
+        <button @click="fetchHistory" class="btn btn-outline text-xs px-3 py-1.5">查询</button>
+      </div>
+    </div>
+
       <div class="charts-grid">
         <div class="chart-card">
           <h3 class="chart-title">CPU 核心使用率</h3>
@@ -291,6 +313,7 @@ import Layout from '../components/layout/Layout.vue'
 import { useServerStore } from '../stores/server'
 import { monitoringApi } from '../services/api'
 import { ChartManager, ChartOptions } from '../composables/useCharts'
+import axios from 'axios'
 
 const router = useRouter()
 const serverStore = useServerStore()
@@ -339,10 +362,74 @@ const cpuHistory = ref([])
 const memoryHistory = ref([])
 const historyMaxSize = 20
 
+const timeRangeOptions = [
+  { label: '15分钟', value: '15m' },
+  { label: '1小时', value: '1h' },
+  { label: '6小时', value: '6h' },
+  { label: '24小时', value: '24h' },
+  { label: '7天', value: '7d' },
+  { label: '自定义', value: 'custom' },
+]
+const selectedTimeRange = ref('1h')
+const customFrom = ref('')
+const customTo = ref('')
+
+function getTimeRange() {
+  const now = new Date()
+  let from = new Date()
+  switch (selectedTimeRange.value) {
+    case '15m': from = new Date(now.getTime() - 15 * 60 * 1000); break
+    case '1h': from = new Date(now.getTime() - 60 * 60 * 1000); break
+    case '6h': from = new Date(now.getTime() - 6 * 60 * 60 * 1000); break
+    case '24h': from = new Date(now.getTime() - 24 * 60 * 60 * 1000); break
+    case '7d': from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break
+    case 'custom':
+      if (customFrom.value && customTo.value) {
+        return { from: customFrom.value, to: customTo.value }
+      }
+      from = new Date(now.getTime() - 60 * 60 * 1000)
+      break
+  }
+  return {
+    from: formatLocalTime(from),
+    to: formatLocalTime(now),
+  }
+}
+
+function formatLocalTime(d) {
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+async function fetchHistory() {
+  if (!currentServer.value?.id) return
+  const { from, to } = getTimeRange()
+  try {
+    const res = await axios.get(`/api/monitor/history/${currentServer.value.id}`, { params: { from_time: from, to_time: to } })
+    if (res.data?.ok) {
+      const data = res.data.data
+      if (data.timestamps && data.timestamps.length > 0) {
+        const merged = []
+        const len = data.timestamps.length
+        for (let i = 0; i < len; i++) {
+          merged.push({ time: data.timestamps[i], cpu: data.cpu_usage[i] || 0, memory: data.memory_usage[i] || 0 })
+        }
+        dbHistory.value = merged
+        await nextTick()
+        updateAllCharts()
+      }
+    }
+  } catch (e) {
+    console.error('获取历史数据失败:', e)
+  }
+}
+
 const getTimeLabel = () => {
   const now = new Date()
   return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`
 }
+
+const dbHistory = ref([])
 
 const addHistory = () => {
   const time = getTimeLabel()
@@ -430,20 +517,26 @@ const updateAllCharts = () => {
     chartManager.updateChart('network', ChartOptions.networkTraffic(systemData.value.network.interfaces))
   }
 
-  if (chartManager.getChart('cpuHistory') && cpuHistory.value.length > 1) {
-    chartManager.updateChart('cpuHistory', ChartOptions.historyTrend(
-      cpuHistory.value.map(h => h.time),
-      cpuHistory.value.map(h => h.usage),
-      '#4F6EF7', 'CPU'
-    ))
+  if (chartManager.getChart('cpuHistory')) {
+    const history = dbHistory.value.length > 0 ? dbHistory.value : cpuHistory.value
+    if (history.length > 1) {
+      chartManager.updateChart('cpuHistory', ChartOptions.historyTrend(
+        history.map(h => h.time),
+        history.map(h => h.cpu !== undefined ? h.cpu : h.usage),
+        '#4F6EF7', 'CPU'
+      ))
+    }
   }
 
-  if (chartManager.getChart('memoryHistory') && memoryHistory.value.length > 1) {
-    chartManager.updateChart('memoryHistory', ChartOptions.historyTrend(
-      memoryHistory.value.map(h => h.time),
-      memoryHistory.value.map(h => h.usage),
-      '#22C55E', '内存'
-    ))
+  if (chartManager.getChart('memoryHistory')) {
+    const history = dbHistory.value.length > 0 ? dbHistory.value : memoryHistory.value
+    if (history.length > 1) {
+      chartManager.updateChart('memoryHistory', ChartOptions.historyTrend(
+        history.map(h => h.time),
+        history.map(h => h.memory !== undefined ? h.memory : h.usage),
+        '#22C55E', '内存'
+      ))
+    }
   }
 }
 
@@ -456,9 +549,11 @@ const handleResize = () => {
 }
 
 onMounted(async () => {
+  window.__monitoringChartManager = chartManager
   if (!serverStore.servers.length) await serverStore.fetchServers()
   if (!currentServer.value && serverStore.servers.length > 0) serverStore.setCurrentServer(serverStore.servers[0])
   await fetchMonitorData()
+  if (currentServer.value?.id) await fetchHistory()
   refreshTimer = setInterval(fetchMonitorData, 5000)
   window.addEventListener('resize', handleResize)
 })

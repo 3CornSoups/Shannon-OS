@@ -130,3 +130,39 @@ async def api_generate_template(payload: TemplateGenerateRequest) -> dict:
         return {"ok": True, "template": template}
     except Exception as exc:
         return {"ok": False, "message": f"生成失败: {str(exc)}"}
+
+
+# ---- 通知渠道配置 ----
+
+@router.get("/settings/notifications")
+async def api_get_notification_settings() -> dict:
+    from app.database import NOTIFICATION_SETTING_KEYS, get_app_settings
+    settings = await get_app_settings(list(NOTIFICATION_SETTING_KEYS))
+    return {"ok": True, "data": settings}
+
+
+@router.put("/settings/notifications")
+async def api_save_notification_settings(request: Request) -> dict:
+    from app.database import set_app_setting
+    data = await request.json()
+    for key, value in data.items():
+        await set_app_setting(key, str(value))
+    return {"ok": True, "message": "通知配置保存成功"}
+
+
+@router.post("/settings/notifications/test")
+async def api_test_notification(request: Request) -> dict:
+    from app.notification import NotificationManager
+    data = await request.json()
+    channel = data.get("channel", "")
+    if not channel:
+        return {"ok": False, "message": "请指定渠道 (dingtalk/email/webhook)"}
+
+    # 先保存临时配置
+    from app.database import set_app_setting
+    for key, value in data.items():
+        if key != "channel":
+            await set_app_setting(key, str(value))
+
+    nm = NotificationManager()
+    return await nm.send_test(channel)

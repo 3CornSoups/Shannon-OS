@@ -10,6 +10,8 @@ from fastapi.responses import FileResponse
 from app.connection import pool as ssh_pool
 from app.database import init_db
 from app.routers import (
+    alert_rules,
+    alerts,
     chat,
     files,
     history,
@@ -17,6 +19,7 @@ from app.routers import (
     monitoring,
     settings as settings_router,
     terminal,
+    tools,
 )
 
 app = FastAPI(title="Shannon OS Agent API", version="2.0.0")
@@ -37,6 +40,15 @@ app.include_router(terminal.router)
 app.include_router(files.router)
 app.include_router(monitoring.router)
 app.include_router(history.router)
+app.include_router(alert_rules.router)
+app.include_router(alerts.router)
+app.include_router(tools.router)
+
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "ok", "version": "2.0.0"}
+
 
 logger = logging.getLogger("uvicorn")
 
@@ -46,6 +58,10 @@ async def startup_event():
     await init_db()
     await ssh_pool.start()
     logging.basicConfig(level=logging.INFO)
+
+    from app.monitor_scheduler import MonitorScheduler
+    app.state.monitor_scheduler = MonitorScheduler()
+    await app.state.monitor_scheduler.start()
 
     web_dist_path = Path(__file__).resolve().parent.parent / "web" / "dist"
     if web_dist_path.exists():
@@ -69,6 +85,11 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    from app.repl_sessions import close_all_sessions as _close_repl
+
+    if hasattr(app.state, "monitor_scheduler"):
+        await app.state.monitor_scheduler.stop()
+    await _close_repl()
     await ssh_pool.stop()
 
 

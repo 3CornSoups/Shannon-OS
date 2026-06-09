@@ -101,17 +101,24 @@ async def list_directory(payload: FileListRequest) -> dict[str, Any]:
     target = await _build_target(payload)
     path = payload.path.rstrip("/") or "/"
 
-    # 使用 find + stat 替代 shell globbing，避免路径含空格等问题
-    cmd = f"find {path} -maxdepth 1 -mindepth 1 -exec stat -c '%F|%s|%Y|%n' {{}} \\; 2>/dev/null"
+    # 优先用 find + shell test（跨平台兼容，不依赖 GNU stat）
+    cmd = (
+        f"find {path} -maxdepth 1 -mindepth 1 "
+        f"| while IFS= read -r f; do "
+        f"s=$(stat -c %s \"$f\" 2>/dev/null || stat -f %z \"$f\" 2>/dev/null || echo 0); "
+        f"if [ -d \"$f\" ]; then echo \"d|$s|$f\"; "
+        f"elif [ -L \"$f\" ]; then echo \"l|$s|$f\"; "
+        f"else echo \"f|$s|$f\"; fi; "
+        f"done 2>/dev/null"
+    )
     result = await _exec_ssh_command(target, cmd)
 
-    if result["returncode"] != 0 or not result["stdout"].strip():
+    if not result["stdout"].strip():
         # 备用方案：使用 ls -la 并解析
         cmd2 = f"ls -la {path} 2>&1"
         result2 = await _exec_ssh_command(target, cmd2)
         if result2["returncode"] != 0:
             return {"ok": False, "message": f"无法访问目录: {result2['stderr'] or result2['stdout']}"}
-        # 解析 ls -la 输出
         return await _parse_ls_output(target, path, result2["stdout"])
 
     entries = []
@@ -119,20 +126,19 @@ async def list_directory(payload: FileListRequest) -> dict[str, Any]:
         if not line.strip():
             continue
         try:
-            parts = line.strip().split("|", 3)
-            if len(parts) < 4:
+            parts = line.strip().split("|", 2)
+            if len(parts) < 3:
                 continue
-            file_type_raw = parts[0].strip()
+            file_type = parts[0].strip()
             size = int(parts[1].strip()) if parts[1].strip().isdigit() else 0
-            mtime = int(parts[2].strip()) if parts[2].strip().isdigit() else 0
-            name = parts[3].strip()
+            name = parts[2].strip()
 
             basename = os.path.basename(name)
             if basename in (".", ".."):
                 continue
 
-            is_dir = "directory" in file_type_raw
-            is_link = "link" in file_type_raw
+            is_dir = file_type == "d"
+            is_link = file_type == "l"
 
             ext = os.path.splitext(basename)[1].lower() if not is_dir else ""
             icon_type = _get_icon_type(basename, ext, is_dir)
@@ -143,7 +149,7 @@ async def list_directory(payload: FileListRequest) -> dict[str, Any]:
                 "is_dir": is_dir,
                 "is_link": is_link,
                 "size": size,
-                "mtime": mtime,
+                "mtime": 0,
                 "icon_type": icon_type,
             })
         except (ValueError, IndexError):
@@ -175,6 +181,16 @@ async def _parse_ls_output(target: TargetHost, path: str, ls_output: str) -> dic
 
         is_dir = perm.startswith("d")
         is_link = perm.startswith("l")
+
+        # 符号链接去掉 -> target 部分
+        if is_link and " -> " in name:
+            link_parts = name.split(" -> ", 1)
+            name = link_parts[0]
+        # 对于 ls -la 列出的符号链接目录，统一按目录处理（用户应该能点进去）
+        if is_link:
+            if name in (".", ".."):
+                continue
+
         size = int(size_str) if size_str.isdigit() else 0
         ext = os.path.splitext(name)[1].lower() if not is_dir else ""
         icon_type = _get_icon_type(name, ext, is_dir)
