@@ -63,6 +63,13 @@ shannonOS/
 ├── desktop/                      # Electron 桌面端
 ├── docs/
 │   └── adr/                      # 架构决策记录（0001-0007）
+│       ├── 0001-dynamic-detection.md      # 动态探测替代 YAML 配置
+│       ├── 0002-dual-channel.md           # 预判器前置 + 双通道设计（已被 0005 部分替代）
+│       ├── 0003-exclusive-connection.md   # 委托期间独占 SSH 连接
+│       ├── 0004-risk-based-confirmation.md # 合并确认层 + 风险分流
+│       ├── 0005-llm-only-delegation-decision.md # 移除预判器，LLM 独立决定委托
+│       ├── 0006-mobile-bottom-tab-navigation.md # 移动端底部 Tab 导航
+│       └── 0007-echo-native-agent.md     # 自建 Echo Agent 而非部署 hermes-agent
 ├── CONTEXT.md                    # 领域术语表
 ├── PRD_智能委托调用.md            # 智能委托 PRD（原始需求文档，保持不动）
 ├── DEPLOY.md / README.md
@@ -173,17 +180,16 @@ python -m uvicorn app.main:app --reload
 # 前端构建：cd web && npm run build
 ```
 
-## 当前状态 (2026-05-14)
+## 当前状态 (2026-08-17)
 
-智能委托功能已完整实现，包括：
-- 全部 13 个功能需求（FR-01 ~ FR-13）
-- 全部 6 个用户故事
-- 全部 10 种 SSE 事件（新增 `delegate_permission_required`）
-- 全部委托 API 路由（新增 `/api/delegate/respond-permission`）
-- **PTY 双向交互**：Claude Code 委托改为交互 REPL 模式，支持权限提示检测 + 用户确认
-- 前端委托卡片 + 安装弹窗 + 冲突弹窗 + **权限确认条**
-- CONTEXT.md + 4 个 ADR
-- 前后端构建均通过
+已完成：
+- 智能委托全部功能（13 个 FR、6 个用户故事、10 种 SSE 事件、全部委托 API 路由）
+- **PTY 双向交互**：Claude Code 委托为交互 REPL 模式，权限提示检测 + 用户确认
+- 前端委托卡片 + 安装弹窗 + 冲突弹窗 + 权限确认条
+- Echo Agent（aios/echo/，`/echo` 页面）+ AIOS 运行时层（agent_registry / dispatcher / ipc / memory）
+- 告警系统（规则 + 钉钉/邮件通知）、监控调度器、移动端底部 Tab 导航、Electron 桌面端
+- CONTEXT.md + 7 个 ADR（0001-0007）
+- 项目已发布至 GitHub：https://github.com/3CornSoups/Shannon-OS（Apache-2.0）
 
 待测试验证：
 1. 在 agent/auto 模式下用代码重构类提示词触发委托流程
