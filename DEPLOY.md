@@ -44,11 +44,11 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 | `DEEPSEEK_MODEL` | deepseek-chat | 模型名称 |
 | `DEEPSEEK_AUX_MODEL` | — | 辅助模型（可选，用于摘要/审核） |
 | `DASHSCOPE_API_KEY` | — | 通义千问 API 密钥（可选，用于 embedding） |
+| `DASHSCOPE_EMBED_MODEL` | — | 通义千问 embedding 模型名 |
 | `SHANNON_DEFAULT_SSH_PORT` | 22 | 默认 SSH 端口 |
-| `SHANNON_PORT` | 8000 | Web 服务端口 |
 | `SHANNON_MONITOR_INTERVAL` | 60 | 监控采集间隔（秒），最低 10 |
-| `SHANNON_DINGTALK_WEBHOOK_URL` / `SHANNON_DINGTALK_SECRET` | — | 钉钉机器人通知（可选） |
-| `SHANNON_SMTP_HOST` / `PORT` / `USERNAME` / `PASSWORD` / `RECIPIENTS` | — | 邮件通知（可选） |
+
+> 钉钉 / 邮件通知配置在 Web UI「设置」页中维护（存入数据库），不走环境变量。
 
 ## 数据与安全
 
