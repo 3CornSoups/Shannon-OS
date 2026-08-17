@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shannon OS Agent — 项目架构图</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --blue: #58a6ff;
+    --purple: #d2a8ff;
+    --orange: #f0883e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh; width: 100vw; overflow: hidden;
+  }
+  svg { width: 100%; height: 100%; }
+  .conn-line { stroke: #30363d; stroke-width: 1.5; fill: none; }
+  .conn-line.green  { stroke: var(--green);  stroke-dasharray: 6 3; opacity: 0.45; }
+  .conn-line.blue   { stroke: var(--blue);   stroke-dasharray: 6 3; opacity: 0.45; }
+  .conn-line.purple { stroke: var(--purple); opacity: 0.35; }
+  .conn-line.orange { stroke: var(--orange); stroke-dasharray: 4 4; opacity: 0.4; }
+  .node-rect { rx: 8; ry: 8; }
+  .node-title {
+    font-size: 11px; fill: var(--text); text-anchor: middle;
+    font-weight: 600;
+  }
+  .node-sub {
+    font-size: 9px; fill: var(--muted); text-anchor: middle;
+  }
+  .layer-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .header {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 50; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px 20px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .header h1 { font-size: 15px; font-weight: 600; white-space: nowrap; }
+  .header .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    background: rgba(88,166,255,0.15); color: var(--blue);
+  }
+  .legend {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 24px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 8px 20px; z-index: 50;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔷 Shannon OS Agent 项目架构图</h1>
+  <span class="badge">v2.0.0</span>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>前端 (Vue 3)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>后端 (Python / FastAPI)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>核心引擎 (Agent + 执行)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>数据与外部服务</div>
+</div>
+
+<div id="canvas-container">
+  <svg id="svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet"></svg>
+</div>
+
+<script>
+const svg = document.getElementById('svg');
+const NS = 'http://www.w3.org/2000/svg';
+
+const nodes = [
+  // ── 第一层：前端 Vue 3 ──
+  { id:'run',     x:710, y:30,  w:180, h:36, color:'#46954a', text:'run.py', sub:'一键启动 (venv + 依赖 + 构建 + 服务)', layer:'FRONTEND' },
+  { id:'vue',     x:710, y:95,  w:180, h:38, color:'#3fb950', text:'Vue 3 前端应用', sub:'web/ — Vite + Pinia + Vue Router', layer:'FRONTEND' },
+  { id:'pages',   x:380, y:165, w:200, h:36, color:'#2ea043', text:'7 个页面组件', sub:'Dashboard / Servers / Monitoring / History / Settings / Templates', layer:'FRONTEND' },
+  { id:'layout',  x:620, y:165, w:180, h:36, color:'#2ea043', text:'Layout + 通用组件', sub:'Trae IDE 布局 / FileExplorer / Terminal', layer:'FRONTEND' },
+  { id:'api_js',  x:840, y:165, w:180, h:36, color:'#2ea043', text:'API 服务 + 状态管理', sub:'services/api.js + 5×Pinia Stores + Composables', layer:'FRONTEND' },
+
+  // ── 第二层：后端 FastAPI ──
+  { id:'fastapi', x:710, y:250, w:180, h:38, color:'#58a6ff', text:'FastAPI 入口', sub:'app/main.py — 路由注册 + 中间件 + SPA 挂载', layer:'BACKEND' },
+  { id:'routers', x:450, y:325, w:700, h:38, color:'#3d8ce0', text:'7 个 API 路由模块', sub:'chat.py / hosts.py / monitoring.py / history.py / settings.py / files.py / terminal.py', layer:'BACKEND' },
+
+  // ── 第三层：核心引擎 ──
+  { id:'agent',     x:280, y:430, w:200, h:42, color:'#d2a8ff', text:'🤖 agent.py — Agent 编排核心', sub:'五阶段流水线: 意图→计划→评估→执行→自修复', layer:'CORE' },
+  { id:'llm',       x:280, y:505, w:200, h:36, color:'#b088e0', text:'LLM 客户端 + 提示词管理', sub:'llm_client.py / prompts.py / conversation.py / models.py', layer:'CORE' },
+  { id:'executor',  x:590, y:430, w:220, h:42, color:'#d2a8ff', text:'⚡ executor.py — 命令执行器', sub:'本地 subprocess + SSH 远程执行 + cwd 追踪', layer:'CORE' },
+  { id:'ssh',       x:590, y:505, w:220, h:36, color:'#b088e0', text:'SSH 连接池 + 系统监控', sub:'connection.py (双引擎) / monitor.py (/proc)', layer:'CORE' },
+  { id:'events_m',  x:910, y:430, w:200, h:42, color:'#b088e0', text:'SSE 事件 + 异常处理 + 日志', sub:'events.py / errors.py / logger.py / settings.py', layer:'CORE' },
+
+  // ── 第四层：数据与外部 ──
+  { id:'database', x:280, y:600, w:200, h:42, color:'#f0883e', text:'🗄 数据持久化', sub:'database.py (8 张表) + security.py + aiosqlite', layer:'DATA' },
+  { id:'storage',  x:280, y:670, w:200, h:36, color:'#d07030', text:'文件存储', sub:'data/shannon.db + logs/ (LLM 日志)', layer:'DATA' },
+  { id:'deepseek', x:590, y:600, w:220, h:42, color:'#f778ba', text:'🌐 DeepSeek API', sub:'AI 大模型服务 — 兼容 OpenAI 格式 + Tool Calling', layer:'DATA' },
+  { id:'servers',  x:590, y:670, w:220, h:36, color:'#f778ba', text:'🖧 SSH 目标服务器集群', sub:'通过 asyncssh + paramiko 双引擎远程管理', layer:'DATA' },
+];
+
+const connections = [
+  // 启动 → 前后端
+  ['run','vue','green'],
+  ['run','fastapi','green'],
+
+  // 前端内部
+  ['vue','pages','green'],
+  ['vue','layout','green'],
+  ['vue','api_js','green'],
+
+  // 前端 → 后端
+  ['api_js','fastapi','blue'],
+
+  // 后端内部
+  ['fastapi','routers','blue'],
+
+  // 后端 → 核心引擎
+  ['routers','agent','purple'],
+  ['routers','executor','purple'],
+  ['routers','events_m','purple'],
+
+  // 核心引擎内部
+  ['agent','llm','purple'],
+  ['agent','executor','purple'],
+  ['agent','events_m','purple'],
+  ['executor','ssh','purple'],
+  ['executor','events_m','purple'],
+
+  // 核心 → 数据/外部
+  ['llm','deepseek','orange'],
+  ['ssh','servers','orange'],
+  ['executor','servers','orange'],
+  ['events_m','database','orange'],
+  ['database','storage','orange'],
+];
+
+function getNode(id) { return nodes.find(n => n.id === id); }
+
+// Draw connections
+connections.forEach(([from, to, cls]) => {
+  const f = getNode(from), t = getNode(to);
+  if (!f || !t) return;
+  const fx = f.x + f.w/2, fy = f.y + f.h;
+  const tx = t.x + t.w/2, ty = t.y;
+  const midY = (fy + ty) / 2;
+  let d = (Math.abs(fx - tx) < 20 || fy >= ty - 40)
+    ? `M${fx},${fy} C${fx},${midY} ${tx},${midY} ${tx},${ty}`
+    : `M${fx},${fy} L${tx},${ty}`;
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('class', `conn-line ${cls}`);
+  svg.appendChild(path);
+});
+
+// Arrow dots at targets
+const arrowSet = new Set();
+connections.forEach(([from, to]) => {
+  const t = getNode(to);
+  if (!t) return;
+  const key = `${t.x},${t.y}`;
+  if (!arrowSet.has(key)) {
+    arrowSet.add(key);
+    const circle = document.createElementNS(NS, 'circle');
+    circle.setAttribute('cx', t.x + t.w/2);
+    circle.setAttribute('cy', t.y - 3);
+    circle.setAttribute('r', 3);
+    circle.setAttribute('fill', '#484f58');
+    svg.appendChild(circle);
+  }
+});
+
+// Draw nodes
+nodes.forEach(n => {
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('transform', `translate(${n.x},${n.y})`);
+
+  const rect = document.createElementNS(NS, 'rect');
+  rect.setAttribute('class', 'node-rect');
+  rect.setAttribute('width', n.w);
+  rect.setAttribute('height', n.h);
+  rect.setAttribute('fill', n.color);
+
+  const title = document.createElementNS(NS, 'text');
+  title.setAttribute('class', 'node-title');
+  title.setAttribute('x', n.w / 2);
+  title.setAttribute('y', n.sub ? 15 : 24);
+  title.textContent = n.text;
+
+  g.appendChild(rect);
+  g.appendChild(title);
+
+  if (n.sub) {
+    const sub = document.createElementNS(NS, 'text');
+    sub.setAttribute('class', 'node-sub');
+    sub.setAttribute('x', n.w / 2);
+    sub.setAttribute('y', n.h - 6);
+    sub.textContent = n.sub;
+    g.appendChild(sub);
+  }
+
+  svg.appendChild(g);
+});
+
+// Layer separator lines
+const layers = [
+  { label:'前端展现层 — Vue 3 + Vite + Pinia', y:220, color:'#3fb950' },
+  { label:'后端 API 层 — FastAPI + Uvicorn', y:380, color:'#58a6ff' },
+  { label:'核心引擎层 — Agent 编排 + 命令执行 + SSH 管理', y:560, color:'#d2a8ff' },
+  { label:'数据与外部服务层 — SQLite + DeepSeek + SSH', y:735, color:'#f0883e' },
+];
+layers.forEach(l => {
+  const line = document.createElementNS(NS, 'line');
+  line.setAttribute('x1', 130); line.setAttribute('y1', l.y);
+  line.setAttribute('x2', 1470); line.setAttribute('y2', l.y);
+  line.setAttribute('stroke', l.color);
+  line.setAttribute('stroke-width', '1');
+  line.setAttribute('stroke-dasharray', '8 6');
+  line.setAttribute('opacity', '0.2');
+  svg.appendChild(line);
+
+  const txt = document.createElementNS(NS, 'text');
+  txt.setAttribute('x', 135); txt.setAttribute('y', l.y - 7);
+  txt.setAttribute('fill', l.color);
+  txt.setAttribute('font-size', '9');
+  txt.setAttribute('opacity', '0.55');
+  txt.setAttribute('font-weight', '500');
+  txt.textContent = l.label;
+  svg.appendChild(txt);
+});
+</script>
+</body>
+</html>
