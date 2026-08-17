@@ -141,7 +141,7 @@ Shannon OS 的本质是在 LLM 与 Linux 服务器之间构建一个 **AIOS（AI
 | delegate_cancelled | 用户取消委托 |
 | delegate_timeout | 委托超时 |
 | delegate_install_required | 远程服务器缺少 Claude Code |
-| delegate_permission_required | Claude Code 请求权限，等待用户确认（阻塞）|
+| delegate_permission_required | Claude Code 请求权限，等待用户确认（阻塞）※前端已就绪，后端 PTY 权限检测发射待实现 |
 | delegate_fallback | 退回 Agent 模式 |
 | delegation_conflict | 委托期间有新消息到达 |
 
@@ -193,4 +193,4 @@ python -m uvicorn app.main:app --reload
 
 待测试验证：
 1. 在 agent/auto 模式下用代码重构类提示词触发委托流程
-2. PTY 权限提示检测在真实 Claude Code 环境中的正则会话匹配效果
+2. PTY 权限提示检测在真实 Claude Code 环境中的正则会话匹配效果（后端尚未 emit `delegate_permission_required`，当前委托执行中权限请求由 Claude Code 自身处理）
