@@ -188,7 +188,7 @@ async function doConsolidate() {
   consolidating.value = true
   try {
     const res = await memoryApi.consolidate()
-    alert(`提炼完成：处理 ${res.data.processed || 0} 条，合并 ${res.data.merged || 0} 条，删除重复 ${res.data.deleted || 0} 条`)
+    alert(`提炼完成：处理 ${res.data.processed || 0} 条，合并 ${res.data.merged || 0} 条，归档重复 ${res.data.archived || 0} 条`)
     loadMemories()
   } catch (e) {
     console.error('提炼失败:', e)

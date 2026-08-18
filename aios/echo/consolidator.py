@@ -7,18 +7,22 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 from typing import Any
 
-from app.database import delete_memory_entry, list_memory_entries, update_memory_entry
+from app.database import list_memory_entries, update_memory_entry
 from app.llm_client import request_text_from_messages
 from app.settings import load_runtime_settings
 
 logger = logging.getLogger(__name__)
 
 _MAX_ITEMS_PER_GROUP = 30
+
+# 提炼并发锁：防止手动 + 定时同时触发重复提炼
+_consolidate_lock = asyncio.Lock()
 
 _CONSOLIDATE_SYSTEM_PROMPT = """你是 Shannon 的记忆整理员。把一组零散记忆提炼为长期事实。
 
@@ -66,8 +70,22 @@ def _parse_consolidation(raw: str) -> list[dict[str, Any]]:
 
 
 async def consolidate_memories() -> dict[str, int]:
-    """提炼 consolidated=0 的记忆。按类型分批交给 LLM，合并去重后写回。"""
-    result = {"processed": 0, "merged": 0, "deleted": 0}
+    """提炼 consolidated=0 的记忆。按类型分批交给 LLM，合并去重后写回。
+
+    安全约束：
+    - LLM 输出只决定"主条目内容"，不授权删除——被合并条目软归档（标记 consolidated）而非删除
+    - LLM 解析失败/无有效结果时不标记任何条目（留待下次重试）
+    - 并发锁防止手动/定时重复触发
+    """
+    result = {"processed": 0, "merged": 0, "archived": 0}
+    if _consolidate_lock.locked():
+        logger.warning("记忆提炼已在执行中，跳过本次触发")
+        return result
+    async with _consolidate_lock:
+        return await _consolidate_impl(result)
+
+
+async def _consolidate_impl(result: dict[str, int]) -> dict[str, int]:
     try:
         settings = await load_runtime_settings()
         if not settings.get("api_key"):
@@ -100,15 +118,22 @@ async def consolidate_memories() -> dict[str, int]:
                     timeout_sec=90,
                 )
                 consolidated_items = _parse_consolidation(raw)
+                if not consolidated_items:
+                    # 解析失败/无有效结果：不标记任何条目，留待下次重试
+                    logger.warning("记忆提炼解析无有效结果，跳过本批（type=%s）", etype)
+                    continue
                 chunk_ids = {e["id"] for e in chunk}
                 handled: set[int] = set()
                 for item in consolidated_items:
+                    if item["merge_ids"][0] in handled:
+                        continue
                     content = item["content"]
                     try:
                         imp = max(1, min(5, int(item.get("importance", 3))))
                     except (TypeError, ValueError):
                         imp = 3
-                    merge_ids = [i for i in item["merge_ids"] if i in chunk_ids]
+                    # 去重 merge_ids（防 LLM 重复输出同一 id）
+                    merge_ids = list(dict.fromkeys(i for i in item["merge_ids"] if i in chunk_ids))
                     if not merge_ids:
                         continue
                     primary = merge_ids[0]
@@ -117,9 +142,12 @@ async def consolidate_memories() -> dict[str, int]:
                     )
                     result["merged"] += 1
                     handled.add(primary)
+                    # 被合并条目：软归档（标记已提炼，保留数据不删除——防注入误删）
                     for extra in merge_ids[1:]:
-                        await delete_memory_entry(extra)
-                        result["deleted"] += 1
+                        if extra in handled:
+                            continue
+                        await update_memory_entry(extra, consolidated=1)
+                        result["archived"] += 1
                         handled.add(extra)
                 # 未被 LLM 提到的条目直接标记已提炼（保留原内容）
                 for e in chunk:
