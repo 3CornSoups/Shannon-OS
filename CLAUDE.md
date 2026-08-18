@@ -165,6 +165,13 @@ Shannon OS 的本质是在 LLM 与 Linux 服务器之间构建一个 **AIOS（AI
 - `operation_logs` 表 — 操作日志（含 delegate 模式）
 - 委托前后双审计（LLM 风险评级 + Agent 命令审计）
 
+## Git 工作流约定
+
+- **非文档类改动**（代码/功能/配置）：**不要直接 push main**。先创建 feature 分支（`git checkout -b feat/<简述>`），在分支上完成并验证后，推分支并创建 PR（用 `gh pr create`；若 gh CLI 不可用则推送分支后提示用户手动在 GitHub 开 PR）
+- **文档类小改动**（README / DEPLOY / CLAUDE.md / 注释 / ADR）：可直接在 main 上修改并推送
+- **合并/推送前的验证**：前端 `cd web && npm run build` 通过；后端 `python -m compileall app aios agents` 通过
+- **红线**：`.env`、`data/`（含加密密码的 SQLite）、`logs/`、凭据类脚本（backup_cloud.py / deploy_dist.py）永不进入版本控制
+
 ## 启动方式
 
 ```bash
