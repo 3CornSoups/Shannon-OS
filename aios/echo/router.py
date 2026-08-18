@@ -36,6 +36,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["echo"])
 
+# 会话级"待提取"计数：每 _EXTRACT_INTERVAL 轮触发一次实时记忆沉淀（内存态，重启归零）
+_EXTRACT_INTERVAL = 5
+_pending_extract_counts: dict[int, int] = {}
+
 
 # ── 请求模型 ──
 
@@ -130,6 +134,13 @@ async def _run_echo_chat(task_id: str, conv_id: int, message: str) -> None:
         full = full.strip()
         await add_message(conv_id, "assistant", full or "（未生成回复）")
         await _maybe_auto_title(conv_id, message)
+        # 实时记忆沉淀：每 _EXTRACT_INTERVAL 轮触发一次（异步执行，不阻塞 SSE）
+        count = _pending_extract_counts.get(conv_id, 0) + 1
+        _pending_extract_counts[conv_id] = count
+        if count % _EXTRACT_INTERVAL == 0:
+            from aios.echo.extractor import extract_and_store_memories
+            recent = await get_messages(conv_id, limit=20)
+            asyncio.create_task(extract_and_store_memories(conv_id, recent))
         await event_store.emit(task_id, {
             "type": "done", "message": full, "conversation_id": conv_id,
         })
