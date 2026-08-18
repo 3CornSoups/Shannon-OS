@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -73,6 +75,24 @@ async def startup_event():
     app.state.monitor_scheduler = MonitorScheduler()
     await app.state.monitor_scheduler.start()
 
+    # -- Echo 记忆每日提炼（03:17） --
+    from aios.echo.consolidator import consolidate_memories
+
+    async def _memory_consolidation_loop():
+        while True:
+            now = datetime.now()
+            target = now.replace(hour=3, minute=17, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            await asyncio.sleep((target - now).total_seconds())
+            try:
+                result = await consolidate_memories()
+                logger.info("每日记忆提炼完成: %s", result)
+            except Exception as exc:
+                logger.warning("每日记忆提炼失败（次日重试）: %s", exc)
+
+    app.state.memory_consolidate_task = asyncio.create_task(_memory_consolidation_loop())
+
     web_dist_path = Path(__file__).resolve().parent.parent / "web" / "dist"
     if web_dist_path.exists():
 
@@ -97,6 +117,9 @@ async def startup_event():
 async def shutdown_event():
     from app.repl_sessions import close_all_sessions as _close_repl
 
+    task = getattr(app.state, "memory_consolidate_task", None)
+    if task:
+        task.cancel()
     if hasattr(app.state, "monitor_scheduler"):
         await app.state.monitor_scheduler.stop()
     await _close_repl()
