@@ -67,6 +67,11 @@ const router = createRouter({
       path: '/echo/reports',
       name: 'EchoReports',
       component: () => import('../pages/EchoReports.vue')
+    },
+    {
+      path: '/memory',
+      name: 'Memory',
+      component: () => import('../pages/Memory.vue')
     }
   ]
 })

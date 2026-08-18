@@ -250,6 +250,7 @@ const moreItems = [
   { path: '/tools', label: '工具', icon: '🧰' },
   { path: '/monitor-overview', label: '监控仪表盘', icon: '📊' },
   { path: '/settings', label: '设置', icon: '⚙️' },
+  { path: '/memory', label: '记忆库', icon: '🧠' },
   { path: '/showcase', label: '关于', icon: 'ℹ️' },
 ]
 

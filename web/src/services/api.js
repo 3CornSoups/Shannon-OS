@@ -127,6 +127,17 @@ export const echoApi = {
   deleteReport: (reportId) => api.delete(`/echo/reports/${reportId}`),
 }
 
+// 记忆库
+export const memoryApi = {
+  list: (params) => api.get('/echo/memory', { params }),
+  search: (q) => api.get('/echo/memory/search', { params: { q } }),
+  create: (data) => api.post('/echo/memory', data),
+  update: (id, data) => api.put(`/echo/memory/${id}`, data),
+  remove: (id) => api.delete(`/echo/memory/${id}`),
+  consolidate: () => api.post('/echo/memory/consolidate'),
+  profile: () => api.get('/echo/memory/profile'),
+}
+
 export const toolApi = {
   // 探测远程服务器上的大工具
   listTools: (hostId) => api.get('/tools/list', { params: { host_id: hostId } }),
