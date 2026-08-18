@@ -43,6 +43,12 @@ async def api_test_api_connection(request: Request) -> dict:
     if not api_key:
         return {"ok": False, "message": "请输入API Key"}
 
+    # 校验 API 地址格式：仅允许 http/https，拒绝 file:// 等非网络 scheme
+    from urllib.parse import urlparse
+    parsed = urlparse(api_base)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return {"ok": False, "message": "API 地址格式无效（需 http/https）"}
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(

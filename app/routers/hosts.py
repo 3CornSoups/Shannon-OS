@@ -148,7 +148,10 @@ async def api_host_test(payload: HostTestRequest) -> dict[str, Any]:
 
 @router.get("/context/{host_id}")
 async def api_get_context(host_id: int) -> Dict[str, Any]:
-    host_context = await get_host_context(host_id)
+    # 不返回解密凭据（前端无消费者依赖密码字段；后端连接走内部解密路径）
+    host_context = await get_host_context(host_id, decrypt_pwd=False)
     if not host_context:
         raise HTTPException(status_code=404, detail="host not found")
+    host_context.pop("last_pwd", None)
+    host_context.pop("pwd_encrypted", None)
     return host_context

@@ -20,12 +20,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import shlex
 from typing import Any, Callable
+from uuid import uuid4
 
 from app.executor import ExecContext
 
 from aios.base_agent import BaseAgent
 from aios.models import BaseAgentConfig
+from aios.security import is_blocked
 from aios.tools import get_tool_registry
 from app.models import AgentConfig
 
@@ -188,8 +191,9 @@ class CodeAgent(BaseAgent):
         """Read a file on the remote server."""
         if not path:
             return "Error: 未指定文件路径"
-        # Use head to limit output to 200 lines
-        cmd = f"test -f '{path}' && (wc -l < '{path}' | xargs -I{{}} echo 'Lines: {{}}'; head -200 '{path}') || echo 'Error: file not found or not a regular file: {path}'"
+        # Use head to limit output to 200 lines; shlex.quote 防注入
+        q = shlex.quote(path)
+        cmd = f"test -f {q} && (wc -l < {q} | xargs -I{{}} echo 'Lines: {{}}'; head -200 {q}) || echo 'Error: file not found or not a regular file: {path}'"
         out, rc = await self._run_ssh(cmd, executor)
         return f"Remote file: {path}\n{out}"
 
@@ -197,15 +201,17 @@ class CodeAgent(BaseAgent):
         """Write content to a file on the remote server."""
         if not path:
             return "Error: 未指定文件路径"
-        # Escape single quotes and use heredoc-style write
+        # 随机 heredoc 分隔符 + shlex.quote 防注入/提前终止
         escaped = content.replace("\\", "\\\\").replace("'", "'\\''")
-        cmd = f"cat > '{path}' << 'SHANNON_EOF'\n{escaped}\nSHANNON_EOF\necho 'Written successfully: {path} ('$(wc -c < '{path}')' bytes)'"
+        q = shlex.quote(path)
+        delim = f"SHANNON_EOF_{uuid4().hex[:8]}"
+        cmd = f"cat > {q} << '{delim}'\n{escaped}\n{delim}\necho 'Written successfully: {path} ('$(wc -c < {q})' bytes)'"
         out, rc = await self._run_ssh(cmd, executor, timeout=30)
         return f"Write result:\n{out}" if rc == 0 else f"Error writing file:\n{out}"
 
     async def _list_remote_dir(self, path: str, executor) -> str:
         """List directory on the remote server."""
-        cmd = f"ls -lah '{path}' 2>&1 | head -100"
+        cmd = f"ls -lah {shlex.quote(path)} 2>&1 | head -100"
         out, rc = await self._run_ssh(cmd, executor)
         return f"Remote directory: {path}\n{out}"
 
@@ -213,11 +219,11 @@ class CodeAgent(BaseAgent):
         """Search code on the remote server using grep."""
         if not pattern:
             return "Error: 未指定搜索模式"
-        # Build grep command with optional file filter
+        # Build grep command with optional file filter; shlex.quote 防注入
         glob = ""
         if file_pattern and file_pattern != "*":
-            glob = f" --include='{file_pattern}'"
-        cmd = f"grep -rn{glob} --color=never '{pattern}' '{path}' 2>/dev/null | head -50"
+            glob = f" --include={shlex.quote(file_pattern)}"
+        cmd = f"grep -rn{glob} --color=never {shlex.quote(pattern)} {shlex.quote(path)} 2>/dev/null | head -50"
         out, rc = await self._run_ssh(cmd, executor, timeout=30)
         if not out.strip():
             return f"Search '{pattern}' in {path}: no matches found"
@@ -227,6 +233,10 @@ class CodeAgent(BaseAgent):
         """Execute an arbitrary shell command on the remote server."""
         if not command:
             return "Error: 未指定命令"
+        # 硬阻断清单兜底（与 ServerAgent 一致）
+        blocked, reason = is_blocked(command)
+        if blocked:
+            return f"Error: 命令被安全策略拦截: {reason}"
         out, rc = await self._run_ssh(command, executor, timeout=60)
         return f"Command: {command}\nExit: {rc}\n{out[:4000]}"
 

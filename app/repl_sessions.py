@@ -137,7 +137,7 @@ async def create_session(
 
     command = BIG_TOOL_COMMANDS[tool_name]
     if work_dir:
-        command = f"cd {work_dir} && {command}"
+        command = f"cd {shlex.quote(work_dir)} && {command}"
     # 直接运行，不加 PTY：异步读取 stdout + 通过 stdin 写入输入
 
     session_id = str(uuid.uuid4())
