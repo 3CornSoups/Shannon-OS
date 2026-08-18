@@ -101,11 +101,11 @@ async def extract_and_store_memories(conv_id: int, messages: list[dict]) -> dict
         settings = await load_runtime_settings()
         if not settings.get("api_key"):
             return result
-        profile = await get_user_profile()
+        profile = (await get_user_profile() or "").replace("<untrusted", "&lt;untrusted").replace("</untrusted", "&lt;/untrusted")
         user_msgs = "\n".join(
             f"{'用户' if m.get('role') == 'user' else '助手'}: {m.get('content', '')}"
             for m in messages[-10:]
-        )
+        ).replace("<untrusted", "&lt;untrusted").replace("</untrusted", "&lt;/untrusted")
         user_prompt = (
             f"<untrusted>当前用户画像：\n{profile if profile else '（暂无）'}\n\n"
             f"最近对话：\n{user_msgs}</untrusted>\n\n"

@@ -125,17 +125,17 @@ async def _consolidate_impl(result: dict[str, int]) -> dict[str, int]:
                 chunk_ids = {e["id"] for e in chunk}
                 handled: set[int] = set()
                 for item in consolidated_items:
-                    if item["merge_ids"][0] in handled:
+                    # 先过滤去重（防空 merge_ids 索引越界 + LLM 重复输出同一 id）
+                    merge_ids = list(dict.fromkeys(i for i in item["merge_ids"] if i in chunk_ids))
+                    if not merge_ids:
+                        continue
+                    if merge_ids[0] in handled:
                         continue
                     content = item["content"]
                     try:
                         imp = max(1, min(5, int(item.get("importance", 3))))
                     except (TypeError, ValueError):
                         imp = 3
-                    # 去重 merge_ids（防 LLM 重复输出同一 id）
-                    merge_ids = list(dict.fromkeys(i for i in item["merge_ids"] if i in chunk_ids))
-                    if not merge_ids:
-                        continue
                     primary = merge_ids[0]
                     await update_memory_entry(
                         primary, content=content, importance=imp, consolidated=1
