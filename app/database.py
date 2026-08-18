@@ -194,12 +194,21 @@ async def init_db() -> None:
                 vector          TEXT,
                 source_conv_id  INTEGER,
                 host_id         INTEGER,
+                consolidated    INTEGER NOT NULL DEFAULT 0,
                 created_at      TEXT NOT NULL DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_memory_type ON memory_entries(type);
             CREATE INDEX IF NOT EXISTS idx_memory_importance ON memory_entries(importance);
             """
         )
+
+        # 迁移：为旧表添加 consolidated 列（如果不存在）
+        try:
+            await conn.execute("ALTER TABLE memory_entries ADD COLUMN consolidated INTEGER NOT NULL DEFAULT 0")
+            await conn.commit()
+            logger.info("数据库迁移：添加 memory_entries.consolidated 列")
+        except Exception:
+            pass  # 列已存在
 
         # 迁移：为旧表添加 pwd_encrypted 列（如果不存在）
         try:
@@ -1382,13 +1391,28 @@ async def insert_memory_entry(
         await conn.close()
 
 
-async def list_memory_entries(limit: int = 500) -> list[dict]:
+async def list_memory_entries(
+    limit: int = 500,
+    entry_type: str | None = None,
+    importance: int | None = None,
+    consolidated: int | None = None,
+) -> list[dict]:
     conn = await get_connection()
     try:
-        cursor = await conn.execute(
-            "SELECT * FROM memory_entries ORDER BY importance DESC, created_at DESC LIMIT ?",
-            (limit,),
-        )
+        sql = "SELECT * FROM memory_entries WHERE 1=1"
+        params: list = []
+        if entry_type:
+            sql += " AND type = ?"
+            params.append(entry_type)
+        if importance is not None:
+            sql += " AND importance = ?"
+            params.append(importance)
+        if consolidated is not None:
+            sql += " AND consolidated = ?"
+            params.append(consolidated)
+        sql += " ORDER BY importance DESC, created_at DESC LIMIT ?"
+        params.append(limit)
+        cursor = await conn.execute(sql, params)
         rows = await cursor.fetchall()
         await cursor.close()
         return [dict(r) for r in rows]
@@ -1414,6 +1438,7 @@ async def update_memory_entry(
     content: str | None = None,
     importance: int | None = None,
     vector: str | None = None,
+    consolidated: int | None = None,
 ) -> bool:
     conn = await get_connection()
     try:
@@ -1428,6 +1453,9 @@ async def update_memory_entry(
         if vector is not None:
             updates.append("vector = ?")
             params.append(vector)
+        if consolidated is not None:
+            updates.append("consolidated = ?")
+            params.append(int(consolidated))
         if not updates:
             return False
         params.append(entry_id)
@@ -1447,6 +1475,19 @@ async def delete_memory_entry(entry_id: int) -> bool:
         cursor = await conn.execute("DELETE FROM memory_entries WHERE id = ?", (entry_id,))
         await conn.commit()
         return cursor.rowcount > 0
+    finally:
+        await conn.close()
+
+
+async def get_memory_entry(entry_id: int) -> dict | None:
+    conn = await get_connection()
+    try:
+        cursor = await conn.execute(
+            "SELECT * FROM memory_entries WHERE id = ?", (entry_id,)
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return dict(row) if row else None
     finally:
         await conn.close()
 
