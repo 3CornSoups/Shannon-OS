@@ -1,0 +1,17 @@
+{
+  "name": "Shannon OS Agent",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "source .venv/bin/activate && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    }
+  ],
+  "ports": [
+    {
+      "name": "Shannon Web UI",
+      "port": 8000
+    }
+  ]
+}
